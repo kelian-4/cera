@@ -1,0 +1,12 @@
+[package]
+name = "cera"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nix = { version = "0.27", features = ["term", "poll", "signal", "ioctl"] }
+libc = "0.2"
+bitflags = "2"
+
+[profile.release]
+opt-level = 2
