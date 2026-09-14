@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -24,7 +25,7 @@ public:
 
     void deleteRow(int at);
 
-    void insertChar(int row, int col, int c);
+    void insertChar(int row, int col, uint32_t codepoint);
 
     void insertNewline(int row, int col);
 

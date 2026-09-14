@@ -24,11 +24,11 @@ void Buffer::deleteRow(int at) {
     dirty_++;
 }
 
-void Buffer::insertChar(int rowIdx, int col, int c) {
+void Buffer::insertChar(int rowIdx, int col, uint32_t codepoint) {
     if (rowIdx == numRows()) {
         insertRow(numRows(), "");
     }
-    rows_[static_cast<size_t>(rowIdx)].insertChar(col, static_cast<char>(c));
+    rows_[static_cast<size_t>(rowIdx)].insertChar(col, codepoint);
     dirty_++;
 }
 
@@ -37,8 +37,8 @@ void Buffer::insertNewline(int rowIdx, int col) {
         insertRow(rowIdx, "");
     } else {
         Row& current = rows_[static_cast<size_t>(rowIdx)];
-        std::string tail = current.chars().substr(static_cast<size_t>(col));
-        std::string head = current.chars().substr(0, static_cast<size_t>(col));
+        std::string tail = current.substrByChar(col, current.size());
+        std::string head = current.substrByChar(0, col);
         insertRow(rowIdx + 1, tail);
         rows_[static_cast<size_t>(rowIdx)].setChars(head);
     }

@@ -29,6 +29,11 @@ bool matches(const Syntax& syntax, const std::string& filename);
 
 void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax);
 
+const Syntax& cSyntax();
+const Syntax& pythonSyntax();
+const Syntax& javascriptSyntax();
+const Syntax& markdownSyntax();
+
 const std::vector<Syntax>& database();
 
 const Syntax* selectForFilename(const std::string& filename);

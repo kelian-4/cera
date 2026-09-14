@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -29,14 +30,20 @@ public:
     const std::vector<Highlight>& hl() const { return hl_; }
     std::vector<Highlight>& hl() { return hl_; }
 
-    int size() const { return static_cast<int>(chars_.size()); }
-    int rsize() const { return static_cast<int>(render_.size()); }
+    int size() const { return charCount_; }
+    int byteSize() const { return static_cast<int>(chars_.size()); }
+    int rsize() const { return renderCharCount_; }
 
-    void insertChar(int at, char c);
+    const std::vector<size_t>& renderByteOffsets() const { return renderByteOffsets_; }
+    int renderCharWidth(int renderCharIdx) const;
+
+    void insertChar(int at, uint32_t codepoint);
 
     void delChar(int at);
 
     void appendString(const std::string& s);
+
+    std::string substrByChar(int fromCharIdx, int toCharIdx) const;
 
     int cxToRx(int cx) const;
 
@@ -48,11 +55,18 @@ public:
 
     int idx = 0;
 
-    static constexpr int kTabStop = 8;
+    static int tabStop;
 
 private:
+    size_t byteOffsetOf(int charIdx) const;
+
     std::string chars_;
+    int charCount_ = 0;
+
     std::string render_;
+    int renderCharCount_ = 0;
+    std::vector<size_t> renderByteOffsets_;
+
     std::vector<Highlight> hl_;
 };
 

@@ -18,13 +18,23 @@ endif()
 
 add_library(cera_core
     src/terminal/Terminal.cpp
+    src/model/Utf8.cpp
     src/model/Row.cpp
     src/model/Buffer.cpp
     src/syntax/Syntax.cpp
     src/syntax/CSyntax.cpp
+    src/syntax/PythonSyntax.cpp
+    src/syntax/JavaScriptSyntax.cpp
+    src/syntax/MarkdownSyntax.cpp
+    src/io/Json.cpp
+    src/io/Config.cpp
     src/io/FileIO.cpp
     src/view/Colors.cpp
+    src/view/HelpText.cpp
     src/view/ScreenRenderer.cpp
+    src/editor/UndoStack.cpp
+    src/editor/Clipboard.cpp
+    src/editor/BufferManager.cpp
     src/editor/Editor.cpp
 )
 target_include_directories(cera_core PUBLIC src)

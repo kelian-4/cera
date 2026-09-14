@@ -3,8 +3,8 @@
 int main(int argc, char* argv[]) {
     cera::editor::Editor editor;
 
-    if (argc >= 2) {
-        editor.openFile(argv[1]);
+    for (int i = 1; i < argc; i++) {
+        editor.openFile(argv[i]);
     }
 
     editor.run();

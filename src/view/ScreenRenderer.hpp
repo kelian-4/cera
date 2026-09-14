@@ -1,24 +1,40 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
-#include "model/Buffer.hpp"
+#include "editor/BufferManager.hpp"
+#include "io/Config.hpp"
 #include "model/Cursor.hpp"
+#include "model/Selection.hpp"
 #include "syntax/Syntax.hpp"
 #include "terminal/Terminal.hpp"
+#include "view/MessageKind.hpp"
 
 namespace cera::view {
 
+enum class OverlayMode { None, Help, FullDoc };
+
+struct SearchDisplayInfo {
+    bool active = false;
+    std::string term;
+    int currentIndex = 0;
+    int totalMatches = 0;
+};
+
 struct ViewState {
-    const model::Buffer& buffer;
-    const model::Cursor& cursor;
+    const editor::BufferManager& bufferManager;
     int rowoff;
     int coloff;
     int screenrows;
     int screencols;
-    const syntax::Syntax* activeSyntax;
     std::string statusMessage;
+    MessageKind statusMessageKind;
     long statusMessageAgeSeconds;
+    OverlayMode overlay;
+    bool showHelpBar;
+    SearchDisplayInfo search;
+    const io::Config& config;
 };
 
 class AppendBuffer {
@@ -37,10 +53,16 @@ public:
 
     void refresh(const ViewState& state);
 
+    int gutterWidth(const ViewState& state) const;
+    int textAreaScreenRows(const ViewState& state) const;
+
 private:
+    void drawTabBar(AppendBuffer& ab, const ViewState& state);
     void drawRows(AppendBuffer& ab, const ViewState& state);
     void drawStatusBar(AppendBuffer& ab, const ViewState& state);
+    void drawHelpBar(AppendBuffer& ab, const ViewState& state);
     void drawMessageBar(AppendBuffer& ab, const ViewState& state);
+    void drawFullDoc(AppendBuffer& ab, const ViewState& state);
 
     terminal::Terminal& term_;
 };

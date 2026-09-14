@@ -3,6 +3,8 @@
 #include <cctype>
 #include <cstring>
 
+#include "model/Utf8.hpp"
+
 namespace cera::syntax {
 
 namespace {
@@ -32,9 +34,12 @@ bool matches(const Syntax& syntax, const std::string& filename) {
 
 void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) {
     auto& hl = row.hl();
-    hl.assign(row.rsize(), model::Highlight::Normal);
+    hl.assign(static_cast<size_t>(row.rsize()), model::Highlight::Normal);
 
     if (syntax == nullptr) return;
+
+    const std::string& render = row.render();
+    std::vector<model::Highlight> hlByte(render.size(), model::Highlight::Normal);
 
     const std::string& scs = syntax->singlelineCommentStart;
     const std::string& mcs = syntax->multilineCommentStart;
@@ -44,28 +49,27 @@ void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) 
     char inString = '\0';
     bool inComment = (row.idx > 0 && buffer.row(row.idx - 1).hlOpenComment);
 
-    const std::string& render = row.render();
-    int rsize = row.rsize();
+    int rsize = static_cast<int>(render.size());
     int i = 0;
 
     while (i < rsize) {
         char c = render[static_cast<size_t>(i)];
         model::Highlight prevHl =
-            (i > 0) ? hl[static_cast<size_t>(i - 1)] : model::Highlight::Normal;
+            (i > 0) ? hlByte[static_cast<size_t>(i - 1)] : model::Highlight::Normal;
 
         if (!scs.empty() && !inString && !inComment) {
             if (render.compare(static_cast<size_t>(i), scs.size(), scs) == 0) {
-                for (int k = i; k < rsize; k++) hl[static_cast<size_t>(k)] = model::Highlight::Comment;
+                for (int k = i; k < rsize; k++) hlByte[static_cast<size_t>(k)] = model::Highlight::Comment;
                 break;
             }
         }
 
         if (!mcs.empty() && !mce.empty() && !inString) {
             if (inComment) {
-                hl[static_cast<size_t>(i)] = model::Highlight::MLComment;
+                hlByte[static_cast<size_t>(i)] = model::Highlight::MLComment;
                 if (render.compare(static_cast<size_t>(i), mce.size(), mce) == 0) {
                     for (size_t k = 0; k < mce.size(); k++) {
-                        hl[static_cast<size_t>(i) + k] = model::Highlight::MLComment;
+                        hlByte[static_cast<size_t>(i) + k] = model::Highlight::MLComment;
                     }
                     i += static_cast<int>(mce.size());
                     inComment = false;
@@ -77,7 +81,7 @@ void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) 
             }
             if (render.compare(static_cast<size_t>(i), mcs.size(), mcs) == 0) {
                 for (size_t k = 0; k < mcs.size(); k++) {
-                    hl[static_cast<size_t>(i) + k] = model::Highlight::MLComment;
+                    hlByte[static_cast<size_t>(i) + k] = model::Highlight::MLComment;
                 }
                 i += static_cast<int>(mcs.size());
                 inComment = true;
@@ -87,9 +91,9 @@ void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) 
 
         if (syntax->flags & HL_HIGHLIGHT_STRINGS) {
             if (inString) {
-                hl[static_cast<size_t>(i)] = model::Highlight::String;
+                hlByte[static_cast<size_t>(i)] = model::Highlight::String;
                 if (c == '\\' && i + 1 < rsize) {
-                    hl[static_cast<size_t>(i + 1)] = model::Highlight::String;
+                    hlByte[static_cast<size_t>(i + 1)] = model::Highlight::String;
                     i += 2;
                     continue;
                 }
@@ -100,7 +104,7 @@ void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) 
             }
             if (c == '"' || c == '\'') {
                 inString = c;
-                hl[static_cast<size_t>(i)] = model::Highlight::String;
+                hlByte[static_cast<size_t>(i)] = model::Highlight::String;
                 i++;
                 continue;
             }
@@ -110,7 +114,7 @@ void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) 
             if ((std::isdigit(static_cast<unsigned char>(c)) &&
                  (prevSep || prevHl == model::Highlight::Number)) ||
                 (c == '.' && prevHl == model::Highlight::Number)) {
-                hl[static_cast<size_t>(i)] = model::Highlight::Number;
+                hlByte[static_cast<size_t>(i)] = model::Highlight::Number;
                 i++;
                 prevSep = false;
                 continue;
@@ -131,7 +135,7 @@ void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) 
                     model::Highlight h =
                         kw2 ? model::Highlight::Keyword2 : model::Highlight::Keyword1;
                     for (size_t k = 0; k < klen; k++) {
-                        hl[static_cast<size_t>(i) + k] = h;
+                        hlByte[static_cast<size_t>(i) + k] = h;
                     }
                     i += static_cast<int>(klen);
                     matched = true;
@@ -148,6 +152,12 @@ void updateSyntax(model::Buffer& buffer, model::Row& row, const Syntax* syntax) 
         i++;
     }
 
+    const auto& offsets = row.renderByteOffsets();
+    for (int charIdx = 0; charIdx < row.rsize(); charIdx++) {
+        size_t byteOff = offsets[static_cast<size_t>(charIdx)];
+        hl[static_cast<size_t>(charIdx)] = hlByte[byteOff];
+    }
+
     bool changed = (row.hlOpenComment != inComment);
     row.hlOpenComment = inComment;
     if (changed && row.idx + 1 < buffer.numRows()) {
@@ -160,6 +170,16 @@ const Syntax* selectForFilename(const std::string& filename) {
         if (matches(s, filename)) return &s;
     }
     return nullptr;
+}
+
+const std::vector<Syntax>& database() {
+    static const std::vector<Syntax> db = {
+        cSyntax(),
+        pythonSyntax(),
+        javascriptSyntax(),
+        markdownSyntax(),
+    };
+    return db;
 }
 
 }
