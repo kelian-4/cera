@@ -1,2 +1,42 @@
-cera: cera.c
-	$(CC) cera.c -o cera -Wall -Wextra -pedantic -std=c99
+CXX ?= g++
+CXXFLAGS ?= -std=c++17 -Wall -Wextra -Isrc
+LDFLAGS ?=
+
+CORE_SRCS := \
+	src/terminal/Terminal.cpp \
+	src/model/Row.cpp \
+	src/model/Buffer.cpp \
+	src/syntax/Syntax.cpp \
+	src/syntax/CSyntax.cpp \
+	src/io/FileIO.cpp \
+	src/view/Colors.cpp \
+	src/view/ScreenRenderer.cpp \
+	src/editor/Editor.cpp
+
+CORE_OBJS := $(CORE_SRCS:.cpp=.o)
+
+.PHONY: all clean test werror
+
+all: cera
+
+cera: src/main.o $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+model_tests: tests/model_tests.o $(CORE_OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+test: model_tests
+	./model_tests
+
+# Cible stricte : échoue au moindre warning.
+werror:
+	$(MAKE) clean
+	$(MAKE) all CXXFLAGS="$(CXXFLAGS) -Werror"
+	$(MAKE) model_tests CXXFLAGS="$(CXXFLAGS) -Werror"
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+clean:
+	rm -f cera model_tests
+	find src tests -name '*.o' -delete
