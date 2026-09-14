@@ -41,9 +41,6 @@ int ScreenRenderer::textAreaScreenRows(const ViewState& state) const {
 void ScreenRenderer::drawTabBar(AppendBuffer& ab, const ViewState& state) {
     if (state.bufferManager.count() <= 1) return;
 
-    ab.append(bgSequence(state.config.theme.statusBarBg, state.config.trueColor));
-    ab.append(fgSequence(state.config.theme.statusBarFg, state.config.trueColor));
-
     std::string line;
     for (int i = 0; i < state.bufferManager.count(); i++) {
         const auto& ob = state.bufferManager.at(i);
@@ -68,8 +65,6 @@ void ScreenRenderer::drawTabBar(AppendBuffer& ab, const ViewState& state) {
     ab.append(line);
     for (int i = static_cast<int>(line.size()); i < state.screencols; i++) ab.append(" ", 1);
 
-    ab.append(resetFgSequence());
-    ab.append(resetBgSequence());
     ab.append("\r\n", 2);
 }
 
@@ -193,11 +188,6 @@ void ScreenRenderer::drawRows(AppendBuffer& ab, const ViewState& state) {
 void ScreenRenderer::drawStatusBar(AppendBuffer& ab, const ViewState& state) {
     const auto& ob = state.bufferManager.active();
     const model::Buffer& buffer = ob.buffer;
-    const io::ThemeColors& theme = state.config.theme;
-    bool trueColor = state.config.trueColor;
-
-    ab.append(bgSequence(theme.statusBarBg, trueColor));
-    ab.append(fgSequence(theme.statusBarFg, trueColor));
 
     std::string left;
     if (state.search.active) {
@@ -207,9 +197,7 @@ void ScreenRenderer::drawStatusBar(AppendBuffer& ab, const ViewState& state) {
                           state.search.totalMatches);
         left.assign(buf, static_cast<size_t>(n));
     } else {
-        char buf[64];
-        int n = snprintf(buf, sizeof(buf), " %d:%d", ob.cursor.cy + 1, ob.cursor.cx + 1);
-        left.assign(buf, static_cast<size_t>(n));
+        left = " ^H aide";
     }
 
     std::string filename = buffer.filename() ? *buffer.filename() : "[Sans nom]";
@@ -218,20 +206,9 @@ void ScreenRenderer::drawStatusBar(AppendBuffer& ab, const ViewState& state) {
     std::string center = filename;
     if (buffer.dirty()) center += " [modifie]";
 
-    std::string filetype = ob.activeSyntax ? ob.activeSyntax->filetype : "texte brut";
-    int percent = 0;
-    if (buffer.numRows() > 0) {
-        percent = ((ob.cursor.cy + 1) * 100) / buffer.numRows();
-    }
-
-    const int barWidth = 10;
-    int filled = (percent * barWidth) / 100;
-    std::string bar = "[";
-    for (int i = 0; i < barWidth; i++) bar += (i < filled) ? '#' : '-';
-    bar += "]";
-
+    int totalLines = std::max(buffer.numRows(), 1);
     char rightBuf[64];
-    int rn = snprintf(rightBuf, sizeof(rightBuf), "%s %s %3d%% ", filetype.c_str(), bar.c_str(), percent);
+    int rn = snprintf(rightBuf, sizeof(rightBuf), "%d/%d ", ob.cursor.cy + 1, totalLines);
     std::string right(rightBuf, static_cast<size_t>(rn));
 
     int total = state.screencols;
@@ -267,17 +244,11 @@ void ScreenRenderer::drawStatusBar(AppendBuffer& ab, const ViewState& state) {
         written++;
     }
 
-    ab.append(resetFgSequence());
-    ab.append(resetBgSequence());
     ab.append("\r\n", 2);
 }
 
 void ScreenRenderer::drawHelpBar(AppendBuffer& ab, const ViewState& state) {
     if (!state.showHelpBar) return;
-
-    const io::ThemeColors& theme = state.config.theme;
-    ab.append(bgSequence(theme.statusBarBg, state.config.trueColor));
-    ab.append(fgSequence(theme.statusBarFg, state.config.trueColor));
 
     std::string help = " " + shortHelpLine();
     if (static_cast<int>(help.size()) > state.screencols) {
@@ -286,8 +257,6 @@ void ScreenRenderer::drawHelpBar(AppendBuffer& ab, const ViewState& state) {
     ab.append(help);
     for (int i = static_cast<int>(help.size()); i < state.screencols; i++) ab.append(" ", 1);
 
-    ab.append(resetFgSequence());
-    ab.append(resetBgSequence());
     ab.append("\r\n", 2);
 }
 
@@ -310,14 +279,12 @@ void ScreenRenderer::drawFullDoc(AppendBuffer& ab, const ViewState& state) {
     const io::ThemeColors& theme = state.config.theme;
     bool trueColor = state.config.trueColor;
 
-    ab.append(bgSequence(theme.statusBarBg, trueColor));
-    ab.append(fgSequence(theme.statusBarFg, trueColor));
+    ab.append(fgSequence(theme.keyword1, trueColor));
     std::string title = " Documentation de Cera -- Echap pour revenir au fichier ";
     if (static_cast<int>(title.size()) > state.screencols) title = title.substr(0, static_cast<size_t>(state.screencols));
     ab.append(title);
-    for (int i = static_cast<int>(title.size()); i < state.screencols; i++) ab.append(" ", 1);
     ab.append(resetFgSequence());
-    ab.append(resetBgSequence());
+    ab.append("\x1b[K", 3);
     ab.append("\r\n", 2);
 
     int rowsUsed = 1;

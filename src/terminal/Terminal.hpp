@@ -7,6 +7,7 @@
 namespace cera::terminal {
 
 enum EditorKey {
+    NO_KEY = -2,
     BACKSPACE = 127,
     ARROW_LEFT = 1000,
     ARROW_RIGHT,
@@ -45,6 +46,7 @@ struct MouseEvent {
     bool pressed;
     bool isWheel;
     int wheelDelta;
+    bool isDrag;
 };
 
 class Terminal {

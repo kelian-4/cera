@@ -84,11 +84,11 @@ void Terminal::write(const char* buf, size_t len) {
 }
 
 void Terminal::enableMouseReporting() {
-    ::write(STDOUT_FILENO, "\x1b[?1000h\x1b[?1006h", 16);
+    ::write(STDOUT_FILENO, "\x1b[?1002h\x1b[?1006h", 16);
 }
 
 void Terminal::disableMouseReporting() {
-    ::write(STDOUT_FILENO, "\x1b[?1006l\x1b[?1000l", 16);
+    ::write(STDOUT_FILENO, "\x1b[?1006l\x1b[?1002l", 16);
 }
 
 bool Terminal::getCursorPosition(int* rows, int* cols) {
@@ -167,8 +167,13 @@ uint32_t decodeUtf8Sequence(unsigned char lead, int len) {
 int Terminal::readKey() {
     int nread;
     char c;
-    while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-        if (nread == -1 && errno != EAGAIN) die("read");
+    nread = read(STDIN_FILENO, &c, 1);
+    if (nread == 0) {
+        return NO_KEY;
+    }
+    if (nread == -1) {
+        if (errno != EAGAIN) die("read");
+        return NO_KEY;
     }
 
     unsigned char uc = static_cast<unsigned char>(c);
@@ -200,6 +205,7 @@ int Terminal::readKey() {
                 }
                 lastMouse_.button = values[0] & 0x3;
                 lastMouse_.isWheel = (values[0] & 0x40) != 0;
+                lastMouse_.isDrag = (values[0] & 0x20) != 0;
                 lastMouse_.wheelDelta = lastMouse_.isWheel ? ((values[0] & 0x1) ? 1 : -1) : 0;
                 lastMouse_.x = values[1] - 1;
                 lastMouse_.y = values[2] - 1;

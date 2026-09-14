@@ -5,8 +5,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "terminal/Terminal.hpp"
-
 namespace cera::io {
 
 void openFile(model::Buffer& buffer, const std::string& filename) {
@@ -14,7 +12,8 @@ void openFile(model::Buffer& buffer, const std::string& filename) {
 
     FILE* fp = fopen(filename.c_str(), "r");
     if (!fp) {
-        terminal::die("fopen");
+        buffer.setLines({});
+        return;
     }
 
     std::vector<std::string> lines;

@@ -60,6 +60,7 @@ private:
 
     void copySelection();
     void cutSelection();
+    void cutCurrentLine();
     void pasteClipboard();
 
     void toggleHelpBar();
@@ -95,10 +96,6 @@ private:
     std::string searchTerm_;
     int searchCurrentMatch_ = 0;
     int searchTotalMatches_ = 0;
-    model::Position searchSavedCursor_{};
-    int searchSavedRowoff_ = 0;
-    int searchSavedColoff_ = 0;
-
     ReplaceState replaceState_ = ReplaceState::Inactive;
     std::string replaceSearchTerm_;
     std::string replaceWithTerm_;

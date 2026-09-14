@@ -69,6 +69,10 @@ std::string Editor::prompt(const std::string& promptFmt, PromptCallback callback
         refreshScreen();
 
         int c = terminal_.readKey();
+        if (c == EditorKey::NO_KEY) {
+            applyResizeIfNeeded();
+            continue;
+        }
 
         if (c == EditorKey::DEL_KEY || c == ctrl('h') || c == EditorKey::BACKSPACE) {
             if (!buf.empty()) buf.pop_back();
@@ -114,8 +118,8 @@ void Editor::save() {
     int err = 0;
     long len = io::saveFile(ob.buffer, &err);
     if (len >= 0) {
-        char msg[80];
-        snprintf(msg, sizeof(msg), "%ld octets ecrits sur le disque", len);
+        char msg[300];
+        snprintf(msg, sizeof(msg), "%s", ob.buffer.filename()->c_str());
         setStatusMessage(msg, view::MessageKind::Success);
     } else {
         char msg[160];
@@ -562,6 +566,50 @@ void Editor::cutSelection() {
     setStatusMessage("Coupe");
 }
 
+void Editor::cutCurrentLine() {
+    auto& ob = bufferManager_.active();
+    if (ob.buffer.numRows() == 0) return;
+
+    int row = ob.cursor.cy;
+    if (row >= ob.buffer.numRows()) return;
+
+    bool lastRow = (row == ob.buffer.numRows() - 1);
+    std::string lineText = ob.buffer.row(row).chars();
+
+    model::Position from{row, 0};
+    model::Position to;
+    std::string removed;
+
+    if (lastRow && ob.buffer.numRows() == 1) {
+        to = {row, ob.buffer.row(row).size()};
+        removed = lineText;
+    } else if (lastRow) {
+        from = {row - 1, ob.buffer.row(row - 1).size()};
+        to = {row, ob.buffer.row(row).size()};
+        removed = "\n" + lineText;
+    } else {
+        to = {row + 1, 0};
+        removed = lineText + "\n";
+    }
+
+    clipboard_.copy(lineText);
+    deleteSelectionForUndo(from, to);
+
+    ob.cursor.cy = from.row;
+    ob.cursor.cx = from.col;
+    ob.selection.isActive = false;
+
+    EditAction action;
+    action.start = from;
+    action.removedText = removed;
+    action.cursorBefore = {row, ob.cursor.cx};
+    action.cursorAfter = from;
+    action.kind = EditKind::DeleteBlock;
+    recordAction(action);
+
+    setStatusMessage("Ligne coupee");
+}
+
 void Editor::pasteClipboard() {
     auto& ob = bufferManager_.active();
     std::string text = clipboard_.paste();
@@ -686,34 +734,56 @@ void Editor::findNext(int direction) {
 
 void Editor::find() {
     auto& ob = bufferManager_.active();
-    searchSavedCursor_ = {ob.cursor.cy, ob.cursor.cx};
-    searchSavedRowoff_ = ob.rowoff;
-    searchSavedColoff_ = ob.coloff;
+    model::Position startPos{ob.cursor.cy, ob.cursor.cx};
     searchActive_ = true;
     searchTerm_.clear();
 
-    std::string result = prompt("Rechercher: %s (Echap pour annuler, Entree/fleches pour naviguer)",
-        [this](const std::string& text, int key) {
-            searchTerm_ = text;
-            if (key == EditorKey::ARROW_DOWN || key == EditorKey::ARROW_RIGHT || key == '\r') {
-                findNext(1);
-            } else if (key == EditorKey::ARROW_UP || key == EditorKey::ARROW_LEFT) {
-                findNext(-1);
-            } else {
-                updateFindHighlight();
-                if (searchTotalMatches_ > 0) findNext(1);
-            }
-        });
+    while (true) {
+        char msg[160];
+        snprintf(msg, sizeof(msg), "Rechercher: %s", searchTerm_.c_str());
+        setStatusMessage(msg);
+        refreshScreen();
+
+        int c = terminal_.readKey();
+        if (c == EditorKey::NO_KEY) {
+            applyResizeIfNeeded();
+            continue;
+        }
+
+        if (c == '\x1b') {
+            break;
+        }
+        if (c == '\r') {
+            if (!searchTerm_.empty()) findNext(1);
+            continue;
+        }
+        if (c == EditorKey::ARROW_DOWN || c == EditorKey::ARROW_RIGHT) {
+            if (!searchTerm_.empty()) findNext(1);
+            continue;
+        }
+        if (c == EditorKey::ARROW_UP || c == EditorKey::ARROW_LEFT) {
+            if (!searchTerm_.empty()) findNext(-1);
+            continue;
+        }
+        if (c == EditorKey::DEL_KEY || c == ctrl('h') || c == EditorKey::BACKSPACE) {
+            if (!searchTerm_.empty()) searchTerm_.pop_back();
+        } else if (terminal::isEncodedCodepoint(c)) {
+            searchTerm_ += model::utf8::encode(terminal::decodeCodepoint(c));
+        } else if (!std::iscntrl(c) && c < 128) {
+            searchTerm_.push_back(static_cast<char>(c));
+        } else {
+            continue;
+        }
+
+        auto& ob2 = bufferManager_.active();
+        ob2.cursor.cy = startPos.row;
+        ob2.cursor.cx = startPos.col;
+        updateFindHighlight();
+        if (!searchTerm_.empty() && searchTotalMatches_ > 0) findNext(1);
+    }
 
     searchActive_ = false;
-
-    if (result.empty()) {
-        auto& ob2 = bufferManager_.active();
-        ob2.cursor.cy = searchSavedCursor_.row;
-        ob2.cursor.cx = searchSavedCursor_.col;
-        ob2.rowoff = searchSavedRowoff_;
-        ob2.coloff = searchSavedColoff_;
-    }
+    setStatusMessage("");
     clearFindHighlight();
 }
 
@@ -739,13 +809,14 @@ void Editor::gotoLine() {
 }
 
 void Editor::replace() {
-    std::string searchTerm = prompt("Remplacer: cherche %s (Echap pour annuler)", nullptr);
+    std::string searchTerm = prompt("Entre le mot a remplacer: %s (Echap pour annuler)", nullptr);
     if (searchTerm.empty()) return;
 
     std::string replaceWith = prompt("Remplacer par: %s (Echap pour annuler)", nullptr);
 
     auto& ob = bufferManager_.active();
     int replacedCount = 0;
+    bool replaceAll = false;
 
     for (int r = 0; r < ob.buffer.numRows(); r++) {
         size_t searchFromByte = 0;
@@ -757,26 +828,39 @@ void Editor::replace() {
             int charIdx = model::utf8::charIndexForByteOffset(render, pos);
             ob.cursor.cy = r;
             ob.cursor.cx = charIdx;
-            searchActive_ = true;
-            searchTerm_ = searchTerm;
-            updateFindHighlight();
-            refreshScreen();
 
-            setStatusMessage("Remplacer cette occurrence ? (o)ui / (n)on / (t)out / Echap pour arreter");
-            refreshScreen();
-            int key = terminal_.readKey();
-            searchActive_ = false;
+            bool doReplace;
+            if (replaceAll) {
+                doReplace = true;
+            } else {
+                searchActive_ = true;
+                searchTerm_ = searchTerm;
+                updateFindHighlight();
+                refreshScreen();
 
-            if (key == '\x1b') {
-                clearFindHighlight();
-                setStatusMessage("Remplacement interrompu");
-                return;
+                setStatusMessage("Remplacer cette occurrence ? (o)ui / (n)on / (t)out / Echap pour arreter");
+                refreshScreen();
+                int key = EditorKey::NO_KEY;
+                while (key == EditorKey::NO_KEY) {
+                    key = terminal_.readKey();
+                    if (key == EditorKey::NO_KEY) applyResizeIfNeeded();
+                }
+                searchActive_ = false;
+
+                if (key == '\x1b') {
+                    clearFindHighlight();
+                    setStatusMessage("Remplacement interrompu");
+                    return;
+                }
+
+                doReplace = (key == 'o' || key == 'O');
+                if (key == 't' || key == 'T') {
+                    replaceAll = true;
+                    doReplace = true;
+                }
             }
 
-            bool doReplace = (key == 'o' || key == 'O');
-            bool doAll = (key == 't' || key == 'T');
-
-            if (doReplace || doAll) {
+            if (doReplace) {
                 int charCount = model::utf8::codepointCount(searchTerm);
                 model::Position start{r, charIdx};
                 for (int i = 0; i < charCount; i++) {
@@ -795,14 +879,11 @@ void Editor::replace() {
                 recordAction(action);
 
                 replacedCount++;
-                if (doAll) {
-                    ob.cursor.cx = endPos.col;
-                    searchFromByte = model::utf8::byteOffsetForCharIndex(ob.buffer.row(r).render(), endPos.col);
-                    continue;
-                }
                 ob.cursor.cx = endPos.col;
-                break;
+                searchFromByte = model::utf8::byteOffsetForCharIndex(ob.buffer.row(r).render(), endPos.col);
+                continue;
             }
+
             searchFromByte = pos + 1;
             ob.cursor.cx = charIdx + 1;
         }
@@ -829,33 +910,79 @@ void Editor::handleMouseEvent(const terminal::MouseEvent& ev) {
         return;
     }
 
-    if (!ev.pressed) return;
-
     int tabBarHeight = (bufferManager_.count() > 1) ? 1 : 0;
+
+    if (tabBarHeight > 0 && ev.y == 0 && ev.pressed && !ev.isDrag) {
+        int col = 0;
+        for (int i = 0; i < bufferManager_.count(); i++) {
+            const auto& other = bufferManager_.at(i);
+            std::string name = other.buffer.filename() ? *other.buffer.filename() : "[Sans nom]";
+            size_t slash = name.find_last_of('/');
+            if (slash != std::string::npos) name = name.substr(slash + 1);
+            std::string label = " " + name;
+            if (other.buffer.dirty()) label += "*";
+            label += " ";
+            int width = static_cast<int>(label.size()) + 2;
+            if (ev.x >= col && ev.x < col + width) {
+                bufferManager_.switchTo(i);
+                return;
+            }
+            col += width;
+        }
+        return;
+    }
+
+    auto& obAfterTabCheck = bufferManager_.active();
     int gutter = renderer_.gutterWidth(view::ViewState{
-        bufferManager_, ob.rowoff, ob.coloff, screenrows_, screencols_,
+        bufferManager_, obAfterTabCheck.rowoff, obAfterTabCheck.coloff, screenrows_, screencols_,
         statusMessage_, statusMessageKind_, 0, overlay_, showHelpBar_, {}, config_});
 
     int screenRow = ev.y - tabBarHeight;
     int screenCol = ev.x - gutter;
-    if (screenRow < 0 || screenCol < 0) return;
+    if (screenRow < 0) return;
+    if (screenCol < 0) screenCol = 0;
 
-    int filerow = screenRow + ob.rowoff;
-    if (filerow >= ob.buffer.numRows()) {
-        filerow = ob.buffer.numRows() > 0 ? ob.buffer.numRows() - 1 : 0;
+    int filerow = screenRow + obAfterTabCheck.rowoff;
+    if (filerow >= obAfterTabCheck.buffer.numRows()) {
+        filerow = obAfterTabCheck.buffer.numRows() > 0 ? obAfterTabCheck.buffer.numRows() - 1 : 0;
     }
     if (filerow < 0) return;
 
-    int rx = screenCol + ob.coloff;
-    int cx = ob.buffer.numRows() > 0 ? ob.buffer.row(filerow).rxToCx(rx) : 0;
+    int rx = screenCol + obAfterTabCheck.coloff;
+    int cx = obAfterTabCheck.buffer.numRows() > 0 ? obAfterTabCheck.buffer.row(filerow).rxToCx(rx) : 0;
 
-    ob.cursor.cy = filerow;
-    ob.cursor.cx = cx;
-    ob.selection.isActive = false;
+    if (ev.isDrag && ev.pressed) {
+        if (!obAfterTabCheck.selection.isActive) {
+            obAfterTabCheck.selection.isActive = true;
+            obAfterTabCheck.selection.anchor = {obAfterTabCheck.cursor.cy, obAfterTabCheck.cursor.cx};
+        }
+        obAfterTabCheck.cursor.cy = filerow;
+        obAfterTabCheck.cursor.cx = cx;
+        obAfterTabCheck.selection.active = {filerow, cx};
+        return;
+    }
+
+    if (ev.pressed) {
+        obAfterTabCheck.cursor.cy = filerow;
+        obAfterTabCheck.cursor.cx = cx;
+        obAfterTabCheck.selection.isActive = true;
+        obAfterTabCheck.selection.anchor = {filerow, cx};
+        obAfterTabCheck.selection.active = {filerow, cx};
+        return;
+    }
+
+    obAfterTabCheck.cursor.cy = filerow;
+    obAfterTabCheck.cursor.cx = cx;
+    if (obAfterTabCheck.selection.isActive && obAfterTabCheck.selection.empty()) {
+        obAfterTabCheck.selection.isActive = false;
+    }
 }
 
 void Editor::processKeypress() {
     int c = terminal_.readKey();
+    if (c == EditorKey::NO_KEY) {
+        return;
+    }
     auto& ob = bufferManager_.active();
 
     if (overlay_ == view::OverlayMode::FullDoc) {
@@ -1002,6 +1129,14 @@ void Editor::processKeypress() {
 
         case '\x1b':
             ob.selection.isActive = false;
+            break;
+
+        case '\t':
+            insertCodepoint('\t');
+            break;
+
+        case ctrl('k'):
+            cutCurrentLine();
             break;
 
         default:
