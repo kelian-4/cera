@@ -1,14 +1,14 @@
 # CI Status
 
-Commit: 213245f74c8df5886a6f759026549af48b35c6ad
+Commit: 77cb9b9ee0ebaae34dceb5e2eecfe5c51aa4c389
 Branche: dev
-Date: 2026-09-15 04:34:07 UTC
-Run: https://github.com/kelian-4/cera/actions/runs/34929306540
+Date: 2026-09-15 04:36:08 UTC
+Run: https://github.com/kelian-4/cera/actions/runs/34929440647
 
 | Etape | Resultat |
 |---|---|
 | Formatage (fmt) | success |
-| Clippy | success |
+| Clippy | failure |
 | Build | success |
 | Tests | success |
 
@@ -18,16 +18,6 @@ Run: https://github.com/kelian-4/cera/actions/runs/34929306540
 
 ## Log complet - Clippy
 ```
-[1m[92m    Updating[0m crates.io index
-[1m[92m Downloading[0m crates ...
-[1m[92m  Downloaded[0m cfg-if v1.0.4
-[1m[92m  Downloaded[0m bitflags v2.13.2
-[1m[92m  Downloaded[0m nix v0.27.1
-[1m[92m  Downloaded[0m libc v0.2.189
-[1m[92m   Compiling[0m libc v0.2.189
-[1m[92m    Checking[0m cfg-if v1.0.4
-[1m[92m    Checking[0m bitflags v2.13.2
-[1m[92m    Checking[0m nix v0.27.1
 [1m[92m    Checking[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[91merror[0m[1m: this `if` can be collapsed into the outer `match`[0m
    [1m[94m--> [0msrc/editor/core.rs:213:17
@@ -86,25 +76,22 @@ Run: https://github.com/kelian-4/cera/actions/runs/34929306540
 [1m[94m101[0m [92m+ [0m            .map_err(|e| io::Error::[92mother[0m(e))?;
     [1m[94m|[0m
 
-[1m[91merror[0m: could not compile `cera` (lib) due to 4 previous errors
-[1m[33mwarning[0m: build failed, waiting for other jobs to finish...
 [1m[91merror[0m: could not compile `cera` (lib test) due to 4 previous errors
+[1m[33mwarning[0m: build failed, waiting for other jobs to finish...
+[1m[91merror[0m: could not compile `cera` (lib) due to 4 previous errors
 ```
 
 ## Log complet - Build
 ```
-[1m[92m   Compiling[0m libc v0.2.189
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name libc --edition=2021 /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.189/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --allow=unused_qualifications '--warn=clippy::unnecessary_semicolon' '--allow=clippy::unnecessary_cast' '--warn=clippy::ptr_as_ptr' '--allow=clippy::non_minimal_cfg' '--allow=clippy::missing_safety_doc' '--warn=clippy::map_unwrap_or' '--warn=clippy::manual_assert' '--allow=clippy::identity_op' '--warn=clippy::explicit_iter_loop' --cfg 'feature="default"' --cfg 'feature="extra_traits"' --cfg 'feature="std"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("align", "const-extern-fn", "default", "extra_traits", "rustc-dep-of-std", "rustc-std-workspace-core", "std", "use_std"))' -C metadata=b9e858c46794286a -C extra-filename=-225b59a4e9bd79b1 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --cap-lints allow --cfg freebsd12 --check-cfg 'cfg(emscripten_old_stat_abi)' --check-cfg 'cfg(espidf_picolibc)' --check-cfg 'cfg(espidf_time32)' --check-cfg 'cfg(freebsd10)' --check-cfg 'cfg(freebsd11)' --check-cfg 'cfg(freebsd12)' --check-cfg 'cfg(freebsd13)' --check-cfg 'cfg(freebsd14)' --check-cfg 'cfg(freebsd15)' --check-cfg 'cfg(gnu_file_offset_bits64)' --check-cfg 'cfg(gnu_time_bits64)' --check-cfg 'cfg(libc_deny_warnings)' --check-cfg 'cfg(linux_time_bits64)' --check-cfg 'cfg(musl_v1_2_3)' --check-cfg 'cfg(musl32_time64)' --check-cfg 'cfg(musl_redir_time64)' --check-cfg 'cfg(vxworks_lt_25_09)' --check-cfg 'cfg(libc_pauthtest)' --check-cfg 'cfg(target_os,values("switch","aix","ohos","hurd","rtems","visionos","nuttx","cygwin","qurt","qnx"))' --check-cfg 'cfg(target_env,values("illumos","wasi","aix","ohos","nto71_iosock"))' --check-cfg 'cfg(target_arch,values("loongarch64","mips32r6","mips64r6","csky"))'`
-[1m[92m   Compiling[0m cfg-if v1.0.4
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cfg_if --edition=2018 /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cfg-if-1.0.4/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("core", "rustc-dep-of-std"))' -C metadata=fd47af220b565fac -C extra-filename=-e202c1210b381f60 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --cap-lints allow`
-[1m[92m   Compiling[0m bitflags v2.13.2
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name bitflags --edition=2021 /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitflags-2.13.2/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("arbitrary", "bytemuck", "example_generated", "serde", "serde_core", "std"))' -C metadata=8c1a3eb8f2630e06 -C extra-filename=-86956476ac6de8d5 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --cap-lints allow`
-[1m[92m   Compiling[0m nix v0.27.1
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name nix --edition=2021 /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nix-0.27.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --cfg 'feature="default"' --cfg 'feature="ioctl"' --cfg 'feature="poll"' --cfg 'feature="process"' --cfg 'feature="signal"' --cfg 'feature="term"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("acct", "aio", "default", "dir", "env", "event", "feature", "fs", "hostname", "inotify", "ioctl", "kmod", "memoffset", "mman", "mount", "mqueue", "net", "personality", "pin-utils", "poll", "process", "pthread", "ptrace", "quota", "reboot", "resource", "sched", "signal", "socket", "term", "time", "ucontext", "uio", "user", "zerocopy"))' -C metadata=29e502236352d808 -C extra-filename=-61091f233f82b102 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rmeta --extern cfg_if=/home/runner/work/cera/cera/target/debug/deps/libcfg_if-e202c1210b381f60.rmeta --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rmeta --cap-lints allow`
+[1m[92m       Fresh[0m libc v0.2.189
+[1m[92m       Fresh[0m cfg-if v1.0.4
+[1m[92m       Fresh[0m bitflags v2.13.2
+[1m[92m       Fresh[0m nix v0.27.1
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/model/buffer.rs` has changed (1789446953.991208144s, 1m 48s after last build at 1789446845.432723122s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7684b1cb7fc3ad41 -C extra-filename=-265f65eb0fbef32c --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rmeta --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rmeta --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rmeta`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=0373c7d690e4aeca -C extra-filename=-4ea6f987a5324741 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 2.45s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.05s
 ```
 
 ## Log complet - Tests
@@ -113,10 +100,11 @@ Run: https://github.com/kelian-4/cera/actions/runs/34929306540
 [1m[92m       Fresh[0m cfg-if v1.0.4
 [1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m nix v0.27.1
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/editor/undo_stack.rs` has changed (1789446953.990614440s, 1m 47s after last build at 1789446846.270981734s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8b06f7f737320b48 -C extra-filename=-24fe9b87231282b6 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=acaf246eb6f4080d -C extra-filename=-61406aa377921b4c --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
-[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.70s
+[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8b06f7f737320b48 -C extra-filename=-24fe9b87231282b6 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.67s
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-61406aa377921b4c`
 
 running 29 tests
@@ -147,8 +135,8 @@ test model::utf8::tests::test_substr_by_char ... ok
 test syntax::tests::test_syntax_selection ... ok
 test syntax::tests::test_update_syntax_keyword ... ok
 test view::colors::tests::test_ansi256_white ... ok
-test view::colors::tests::test_true_color_sequence ... ok
 test editor::clipboard::tests::test_clipboard_fallback_roundtrip ... ok
+test view::colors::tests::test_true_color_sequence ... ok
 
 test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
