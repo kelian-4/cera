@@ -9,6 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+
 jobs:
   build-and-test:
     name: Build, test & lint
@@ -33,18 +36,56 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Verifier le formatage
+        id: fmt
         run: cargo fmt --check
 
       - name: Lint avec clippy
+        id: clippy
+        if: always() && steps.fmt.outcome != 'cancelled'
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Build
+        id: build
+        if: always() && steps.fmt.outcome != 'cancelled'
         run: cargo build --verbose
 
       - name: Lancer les tests
+        id: tests
+        if: always() && steps.fmt.outcome != 'cancelled'
         run: cargo test --verbose
 
       - name: Notifier en cas d'echec
         if: failure()
         run: |
           curl -d "CI en echec sur cera (${{ github.ref_name }}) - commit ${{ github.sha }}" ntfy.sh/TON_TOPIC_PERSO
+
+      - name: Ecrire le log de statut
+        if: always()
+        run: |
+          {
+            echo "# CI Status"
+            echo ""
+            echo "Commit: ${{ github.sha }}"
+            echo "Branche: ${{ github.ref_name }}"
+            echo "Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "| Etape | Resultat |"
+            echo "|---|---|"
+            echo "| Formatage (fmt) | ${{ steps.fmt.outcome }} |"
+            echo "| Clippy | ${{ steps.clippy.outcome }} |"
+            echo "| Build | ${{ steps.build.outcome }} |"
+            echo "| Tests | ${{ steps.tests.outcome }} |"
+          } > ci-status.md
+
+      - name: Commit et push le log
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ci-status.md
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: mise a jour ci-status.md [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+
