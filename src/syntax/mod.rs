@@ -1,7 +1,7 @@
 pub mod c_syntax;
-pub mod python_syntax;
 pub mod javascript_syntax;
 pub mod markdown_syntax;
+pub mod python_syntax;
 
 use crate::model::buffer::Buffer;
 use crate::model::row::Highlight;
@@ -208,10 +208,7 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
     }
 }
 
-pub fn select_for_filename<'a>(
-    database: &'a [Syntax],
-    filename: &str,
-) -> Option<&'a Syntax> {
+pub fn select_for_filename<'a>(database: &'a [Syntax], filename: &str) -> Option<&'a Syntax> {
     database.iter().find(|s| matches(s, filename))
 }
 

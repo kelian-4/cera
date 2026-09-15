@@ -33,7 +33,9 @@ pub struct AppendBuffer {
 
 impl AppendBuffer {
     pub fn new() -> Self {
-        AppendBuffer { data: String::new() }
+        AppendBuffer {
+            data: String::new(),
+        }
     }
 
     pub fn append(&mut self, s: &str) {
@@ -92,11 +94,7 @@ fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let mut line = String::new();
     for i in 0..state.buffer_manager.count() {
         let ob = state.buffer_manager.at(i);
-        let mut name = ob
-            .buffer
-            .filename()
-            .unwrap_or("[Sans nom]")
-            .to_string();
+        let mut name = ob.buffer.filename().unwrap_or("[Sans nom]").to_string();
         if let Some(pos) = name.rfind('/') {
             name = name[pos + 1..].to_string();
         }
@@ -223,7 +221,10 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
                         ab.append(&fg_sequence(rgb, true_color));
                     }
                 } else {
-                    let h = hl.get(ci).copied().unwrap_or(crate::model::row::Highlight::Normal);
+                    let h = hl
+                        .get(ci)
+                        .copied()
+                        .unwrap_or(crate::model::row::Highlight::Normal);
                     let rgb = crate::view::colors::highlight_to_rgb(h, theme);
                     if current_color_rgb != Some(rgb) {
                         current_color_rgb = Some(rgb);
@@ -418,7 +419,11 @@ pub fn refresh(state: &ViewState) -> String {
 
     let ob = state.buffer_manager.active();
     let gutter = gutter_width(state);
-    let tab_bar_height = if state.buffer_manager.count() > 1 { 1 } else { 0 };
+    let tab_bar_height = if state.buffer_manager.count() > 1 {
+        1
+    } else {
+        0
+    };
 
     let cursor_row = tab_bar_height + (ob.cursor.cy.saturating_sub(state.rowoff)) + 1;
     let cursor_col = gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;

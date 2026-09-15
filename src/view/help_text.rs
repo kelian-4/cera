@@ -68,7 +68,8 @@ pub fn full_documentation() -> &'static [HelpCategory] {
             entries: &[
                 HelpEntry {
                     shortcut: "Ctrl-F",
-                    description: "Rechercher (Entree pour l'occurrence suivante, Echap pour arreter)",
+                    description:
+                        "Rechercher (Entree pour l'occurrence suivante, Echap pour arreter)",
                 },
                 HelpEntry {
                     shortcut: "Ctrl-R",

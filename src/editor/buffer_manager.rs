@@ -84,7 +84,9 @@ impl BufferManager {
         };
 
         file_io::open_file(&mut self.buffers[idx].buffer, filename);
-        let syntax_idx = syntax_db.iter().position(|s| crate::syntax::matches(s, filename));
+        let syntax_idx = syntax_db
+            .iter()
+            .position(|s| crate::syntax::matches(s, filename));
         self.buffers[idx].active_syntax_idx = syntax_idx;
 
         if let Some(sidx) = syntax_idx {

@@ -48,9 +48,17 @@ impl Clipboard {
         if command_exists("xclip") {
             self.tool_name = "xclip".to_string();
             self.copy_program = "xclip".to_string();
-            self.copy_args = vec!["-selection".to_string(), "clipboard".to_string(), "-in".to_string()];
+            self.copy_args = vec![
+                "-selection".to_string(),
+                "clipboard".to_string(),
+                "-in".to_string(),
+            ];
             self.paste_program = "xclip".to_string();
-            self.paste_args = vec!["-selection".to_string(), "clipboard".to_string(), "-out".to_string()];
+            self.paste_args = vec![
+                "-selection".to_string(),
+                "clipboard".to_string(),
+                "-out".to_string(),
+            ];
             self.system_tool_available = true;
             return;
         }

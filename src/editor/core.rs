@@ -44,7 +44,8 @@ pub struct Editor {
 
 impl Editor {
     pub fn new() -> io::Result<Self> {
-        let (config, _loaded) = crate::io::config::load_from_file(&crate::io::config::default_config_path());
+        let (config, _loaded) =
+            crate::io::config::load_from_file(&crate::io::config::default_config_path());
         row::set_tab_stop(config.tab_stop);
 
         let mut terminal = Terminal::new()?;
@@ -102,7 +103,7 @@ impl Editor {
         }
     }
 
-    fn build_view_state(&self, search: SearchDisplayInfo) -> ViewState {
+    fn build_view_state(&self, search: SearchDisplayInfo) -> ViewState<'_> {
         let ob = self.buffer_manager.active();
         ViewState {
             buffer_manager: &self.buffer_manager,
@@ -217,7 +218,11 @@ impl Editor {
         }
 
         has_row = cursor.cy < ob.buffer.num_rows();
-        let rowlen = if has_row { ob.buffer.row(cursor.cy).size() } else { 0 };
+        let rowlen = if has_row {
+            ob.buffer.row(cursor.cy).size()
+        } else {
+            0
+        };
         if cursor.cx > rowlen {
             cursor.cx = rowlen;
         }
@@ -234,7 +239,9 @@ impl Editor {
         if from.row == to.row {
             return buf.row(from.row).substr_by_char(from.col, to.col);
         }
-        let mut result = buf.row(from.row).substr_by_char(from.col, buf.row(from.row).size());
+        let mut result = buf
+            .row(from.row)
+            .substr_by_char(from.col, buf.row(from.row).size());
         result.push('\n');
         for r in (from.row + 1)..to.row {
             result.push_str(buf.row(r).chars());
@@ -253,11 +260,17 @@ impl Editor {
 
         for (seg_idx, segment) in segments.iter().enumerate() {
             for c in segment.chars() {
-                self.buffer_manager.active_mut().buffer.insert_char(row, col, c);
+                self.buffer_manager
+                    .active_mut()
+                    .buffer
+                    .insert_char(row, col, c);
                 col += 1;
             }
             if seg_idx != last_idx {
-                self.buffer_manager.active_mut().buffer.insert_newline(row, col);
+                self.buffer_manager
+                    .active_mut()
+                    .buffer
+                    .insert_newline(row, col);
                 row += 1;
                 col = 0;
             }
@@ -288,7 +301,9 @@ impl Editor {
                     buf.delete_char(from.row, i + 1);
                 }
             } else {
-                let tail_after = buf.row(to.row).substr_by_char(to.col, buf.row(to.row).size());
+                let tail_after = buf
+                    .row(to.row)
+                    .substr_by_char(to.col, buf.row(to.row).size());
                 let head = buf.row(from.row).substr_by_char(0, from.col);
                 for r in (from.row + 1..=to.row).rev() {
                     buf.delete_row(r);
@@ -359,7 +374,11 @@ impl Editor {
         let cursor_row = ob.cursor.cy;
         if let Some(sidx) = active_syntax_idx {
             let syn = &self.syntax_db[sidx];
-            syntax::update_syntax(&mut self.buffer_manager.active_mut().buffer, cursor_row, Some(syn));
+            syntax::update_syntax(
+                &mut self.buffer_manager.active_mut().buffer,
+                cursor_row,
+                Some(syn),
+            );
         }
 
         let ob = self.buffer_manager.active_mut();
@@ -389,7 +408,10 @@ impl Editor {
         let before = Position::new(ob.cursor.cy, ob.cursor.cx);
         let (cy, cx) = (ob.cursor.cy, ob.cursor.cx);
 
-        self.buffer_manager.active_mut().buffer.insert_newline(cy, cx);
+        self.buffer_manager
+            .active_mut()
+            .buffer
+            .insert_newline(cy, cx);
 
         let ob = self.buffer_manager.active();
         let active_syntax_idx = ob.active_syntax_idx;
@@ -437,7 +459,9 @@ impl Editor {
 
         let before = Position::new(ob.cursor.cy, ob.cursor.cx);
         let removed = if ob.cursor.cx > 0 {
-            ob.buffer.row(ob.cursor.cy).substr_by_char(ob.cursor.cx - 1, ob.cursor.cx)
+            ob.buffer
+                .row(ob.cursor.cy)
+                .substr_by_char(ob.cursor.cx - 1, ob.cursor.cx)
         } else {
             "\n".to_string()
         };
@@ -493,13 +517,20 @@ impl Editor {
         let before = Position::new(ob.cursor.cy, ob.cursor.cx);
 
         let (target_row, target_col, removed) = if !at_line_end {
-            let removed = ob.buffer.row(ob.cursor.cy).substr_by_char(ob.cursor.cx, ob.cursor.cx + 1);
+            let removed = ob
+                .buffer
+                .row(ob.cursor.cy)
+                .substr_by_char(ob.cursor.cx, ob.cursor.cx + 1);
             (ob.cursor.cy, ob.cursor.cx + 1, removed)
         } else {
             (ob.cursor.cy + 1, 0, "\n".to_string())
         };
 
-        let pos = self.buffer_manager.active_mut().buffer.delete_char(target_row, target_col);
+        let pos = self
+            .buffer_manager
+            .active_mut()
+            .buffer
+            .delete_char(target_row, target_col);
 
         let ob = self.buffer_manager.active_mut();
         ob.cursor.cy = pos.row;
@@ -542,7 +573,11 @@ impl Editor {
         let line_text = ob.buffer.row(row).chars().to_string();
 
         let (from, to, removed) = if last_row && ob.buffer.num_rows() == 1 {
-            (Position::new(row, 0), Position::new(row, ob.buffer.row(row).size()), line_text.clone())
+            (
+                Position::new(row, 0),
+                Position::new(row, ob.buffer.row(row).size()),
+                line_text.clone(),
+            )
         } else if last_row {
             let prev_size = ob.buffer.row(row - 1).size();
             (
@@ -592,8 +627,14 @@ impl Editor {
                 }
             };
 
-            self.buffer_manager.active_mut().buffer.set_filename(&filename);
-            let syntax_idx = self.syntax_db.iter().position(|s| syntax::matches(s, &filename));
+            self.buffer_manager
+                .active_mut()
+                .buffer
+                .set_filename(&filename);
+            let syntax_idx = self
+                .syntax_db
+                .iter()
+                .position(|s| syntax::matches(s, &filename));
             self.buffer_manager.active_mut().active_syntax_idx = syntax_idx;
 
             if let Some(sidx) = syntax_idx {
@@ -606,13 +647,22 @@ impl Editor {
             }
         }
 
-        let filename = self.buffer_manager.active().buffer.filename().unwrap().to_string();
+        let filename = self
+            .buffer_manager
+            .active()
+            .buffer
+            .filename()
+            .unwrap()
+            .to_string();
         match file_io::save_file(&mut self.buffer_manager.active_mut().buffer) {
             Ok(()) => {
                 self.set_status_message_kind(filename, MessageKind::Success);
             }
             Err(e) => {
-                self.set_status_message_kind(format!("Erreur de sauvegarde : {}", e), MessageKind::Error);
+                self.set_status_message_kind(
+                    format!("Erreur de sauvegarde : {}", e),
+                    MessageKind::Error,
+                );
             }
         }
     }
@@ -664,7 +714,8 @@ impl Editor {
             } else {
                 let buf = &mut self.buffer_manager.active_mut().buffer;
                 let hl = buf.row_mut(r).hl_mut();
-                hl.iter_mut().for_each(|h| *h = crate::model::row::Highlight::Normal);
+                hl.iter_mut()
+                    .for_each(|h| *h = crate::model::row::Highlight::Normal);
             }
         }
     }
@@ -684,7 +735,13 @@ impl Editor {
         let mut match_containing_cursor = 0usize;
 
         for r in 0..num_rows {
-            let render = self.buffer_manager.active().buffer.row(r).render().to_string();
+            let render = self
+                .buffer_manager
+                .active()
+                .buffer
+                .row(r)
+                .render()
+                .to_string();
             let mut search_from = 0usize;
             while let Some(pos) = render[search_from..].find(&term) {
                 let abs_pos = search_from + pos;
@@ -726,7 +783,13 @@ impl Editor {
 
         let mut row = start_row;
         for _ in 0..=num_rows {
-            let render = self.buffer_manager.active().buffer.row(row).render().to_string();
+            let render = self
+                .buffer_manager
+                .active()
+                .buffer
+                .row(row)
+                .render()
+                .to_string();
 
             if direction > 0 {
                 let from_col = if row == start_row { start_col + 1 } else { 0 };
@@ -742,7 +805,11 @@ impl Editor {
                     }
                 }
             } else {
-                let upto = if row == start_row { start_col } else { self.buffer_manager.active().buffer.row(row).size() + 1 };
+                let upto = if row == start_row {
+                    start_col
+                } else {
+                    self.buffer_manager.active().buffer.row(row).size() + 1
+                };
                 let byte_upto = utf8::byte_offset_for_char_index(&render, upto).min(render.len());
                 let mut last_pos: Option<usize> = None;
                 let mut search_pos = 0usize;
@@ -878,7 +945,9 @@ impl Editor {
             Some(s) if !s.is_empty() => s,
             _ => return,
         };
-        let replace_with = self.prompt("Remplacer par: %s (Echap pour annuler)").unwrap_or_default();
+        let replace_with = self
+            .prompt("Remplacer par: %s (Echap pour annuler)")
+            .unwrap_or_default();
 
         let num_rows = self.buffer_manager.active().buffer.num_rows();
         let mut replaced_count = 0i32;
@@ -887,7 +956,13 @@ impl Editor {
         for r in 0..num_rows {
             let mut search_from_byte = 0usize;
             loop {
-                let render = self.buffer_manager.active().buffer.row(r).render().to_string();
+                let render = self
+                    .buffer_manager
+                    .active()
+                    .buffer
+                    .row(r)
+                    .render()
+                    .to_string();
                 let pos = match render[search_from_byte..].find(&search_term) {
                     Some(p) => search_from_byte + p,
                     None => break,
@@ -908,7 +983,9 @@ impl Editor {
                     self.update_find_highlight();
                     self.refresh_screen();
 
-                    self.set_status_message("Remplacer cette occurrence ? (o)ui / (n)on / (t)out / Echap pour arreter");
+                    self.set_status_message(
+                        "Remplacer cette occurrence ? (o)ui / (n)on / (t)out / Echap pour arreter",
+                    );
                     self.refresh_screen();
 
                     let mut key = terminal::NO_KEY;
@@ -938,7 +1015,10 @@ impl Editor {
                     let char_count = utf8::codepoint_count(&search_term);
                     let start = Position::new(r, char_idx);
                     for _ in 0..char_count {
-                        self.buffer_manager.active_mut().buffer.delete_char(r, char_idx + 1);
+                        self.buffer_manager
+                            .active_mut()
+                            .buffer
+                            .delete_char(r, char_idx + 1);
                     }
                     let end_pos = self.insert_text_at(start, &replace_with);
 
@@ -1142,7 +1222,11 @@ impl Editor {
             return;
         }
 
-        let tab_bar_height = if self.buffer_manager.count() > 1 { 1 } else { 0 };
+        let tab_bar_height = if self.buffer_manager.count() > 1 {
+            1
+        } else {
+            0
+        };
 
         if tab_bar_height > 0 && ev.y == 0 && ev.pressed && !ev.is_drag {
             let mut col = 0i32;
@@ -1318,7 +1402,10 @@ impl Editor {
                 }
             }
 
-            terminal::ARROW_UP | terminal::ARROW_DOWN | terminal::ARROW_LEFT | terminal::ARROW_RIGHT => {
+            terminal::ARROW_UP
+            | terminal::ARROW_DOWN
+            | terminal::ARROW_LEFT
+            | terminal::ARROW_RIGHT => {
                 self.move_cursor(c, false);
             }
 
