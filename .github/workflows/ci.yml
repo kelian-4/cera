@@ -37,22 +37,22 @@ jobs:
 
       - name: Verifier le formatage
         id: fmt
-        run: cargo fmt --check
+        run: cargo fmt --check 2>&1 | tee fmt.log
 
       - name: Lint avec clippy
         id: clippy
         if: always() && steps.fmt.outcome != 'cancelled'
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee clippy.log
 
       - name: Build
         id: build
         if: always() && steps.fmt.outcome != 'cancelled'
-        run: cargo build --verbose
+        run: cargo build --verbose 2>&1 | tee build.log
 
       - name: Lancer les tests
         id: tests
         if: always() && steps.fmt.outcome != 'cancelled'
-        run: cargo test --verbose
+        run: cargo test --verbose 2>&1 | tee test.log
 
       - name: Notifier en cas d'echec
         if: failure()
@@ -76,7 +76,28 @@ jobs:
             echo "| Clippy | ${{ steps.clippy.outcome }} |"
             echo "| Build | ${{ steps.build.outcome }} |"
             echo "| Tests | ${{ steps.tests.outcome }} |"
+            echo ""
+            echo "## Log complet - Formatage (fmt)"
+            echo '```'
+            cat fmt.log 2>/dev/null || echo "(pas de log)"
+            echo '```'
+            echo ""
+            echo "## Log complet - Clippy"
+            echo '```'
+            cat clippy.log 2>/dev/null || echo "(pas de log)"
+            echo '```'
+            echo ""
+            echo "## Log complet - Build"
+            echo '```'
+            cat build.log 2>/dev/null || echo "(pas de log)"
+            echo '```'
+            echo ""
+            echo "## Log complet - Tests"
+            echo '```'
+            cat test.log 2>/dev/null || echo "(pas de log)"
+            echo '```'
           } > ci-status.md
+          rm -f fmt.log clippy.log build.log test.log
 
       - name: Commit et push le log
         if: always()
