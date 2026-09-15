@@ -162,7 +162,7 @@ impl Row {
                 let col = utf8::codepoint_count(&render);
                 render.push(' ');
                 let mut new_col = col + 1;
-                while new_col % tab_stop() != 0 {
+                while !new_col.is_multiple_of(tab_stop()) {
                     render.push(' ');
                     new_col += 1;
                 }

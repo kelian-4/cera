@@ -65,8 +65,7 @@ pub struct Terminal {
 impl Terminal {
     pub fn new() -> io::Result<Self> {
         let stdin_fd = std::io::stdin();
-        let orig_termios = termios::tcgetattr(stdin_fd.as_fd())
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let orig_termios = termios::tcgetattr(stdin_fd.as_fd()).map_err(io::Error::other)?;
 
         let mut term = Terminal {
             orig_termios: orig_termios.clone(),
@@ -97,8 +96,7 @@ impl Terminal {
         raw.control_chars[SpecialCharacterIndices::VMIN as usize] = 0;
         raw.control_chars[SpecialCharacterIndices::VTIME as usize] = 1;
 
-        termios::tcsetattr(stdin_fd.as_fd(), SetArg::TCSAFLUSH, &raw)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        termios::tcsetattr(stdin_fd.as_fd(), SetArg::TCSAFLUSH, &raw).map_err(io::Error::other)?;
 
         self.raw_mode_enabled = true;
         Ok(())

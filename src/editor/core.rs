@@ -209,10 +209,8 @@ impl Editor {
                     cursor.cy -= 1;
                 }
             }
-            terminal::ARROW_DOWN => {
-                if cursor.cy < ob.buffer.num_rows() {
-                    cursor.cy += 1;
-                }
+            terminal::ARROW_DOWN if cursor.cy < ob.buffer.num_rows() => {
+                cursor.cy += 1;
             }
             _ => {}
         }
