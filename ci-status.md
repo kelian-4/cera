@@ -1,14 +1,14 @@
 # CI Status
 
-Commit: 8bb244cfff1b4e6270d94e01bf6b87eaa973cfc9
+Commit: 1fe1ba3c53eb220c1c713b5076eec539217f6b5e
 Branche: dev
-Date: 2026-09-15 07:03:06 UTC
-Run: https://github.com/kelian-4/cera/actions/runs/34939735460
+Date: 2026-09-15 09:37:09 UTC
+Run: https://github.com/kelian-4/cera/actions/runs/34953467284
 
 | Etape | Resultat |
 |---|---|
 | Formatage (fmt) | success |
-| Clippy | failure |
+| Clippy | success |
 | Build | success |
 | Tests | success |
 
@@ -19,79 +19,20 @@ Run: https://github.com/kelian-4/cera/actions/runs/34939735460
 ## Log complet - Clippy
 ```
 [1m[92m    Checking[0m cera v0.1.0 (/home/runner/work/cera/cera)
-[1m[91merror[0m[1m: this `if` can be collapsed into the outer `match`[0m
-   [1m[94m--> [0msrc/editor/core.rs:213:17
-    [1m[94m|[0m
-[1m[94m213[0m [1m[94m|[0m [1m[91m/[0m                 if cursor.cy < ob.buffer.num_rows() {
-[1m[94m214[0m [1m[94m|[0m [1m[91m|[0m                     cursor.cy += 1;
-[1m[94m215[0m [1m[94m|[0m [1m[91m|[0m                 }
-    [1m[94m|[0m [1m[91m|_________________^[0m
-    [1m[94m|[0m
-    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_match
-    [1m[94m= [0m[1mnote[0m: `-D clippy::collapsible-match` implied by `-D warnings`
-    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::collapsible_match)]`
-[1m[96mhelp[0m: collapse nested if block
-    [1m[94m|[0m
-[1m[94m212[0m [92m~ [0m            terminal::ARROW_DOWN
-[1m[94m213[0m [92m~ [0m                if cursor.cy < ob.buffer.num_rows() [92m=> [0m{
-[1m[94m214[0m [1m[94m|[0m                     cursor.cy += 1;
-[1m[94m215[0m [92m~ [0m                }
-    [1m[94m|[0m
-
-[1m[91merror[0m[1m: manual implementation of `.is_multiple_of()`[0m
-   [1m[94m--> [0msrc/model/row.rs:165:23
-    [1m[94m|[0m
-[1m[94m165[0m [1m[94m|[0m                 while new_col % tab_stop() != 0 {
-    [1m[94m|[0m                       [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^[0m [1m[91mhelp: replace with: `!new_col.is_multiple_of(tab_stop())`[0m
-    [1m[94m|[0m
-    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
-    [1m[94m= [0m[1mnote[0m: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
-    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
-
-[1m[91merror[0m[1m: this can be `std::io::Error::other(_)`[0m
-  [1m[94m--> [0msrc/terminal/mod.rs:69:26
-   [1m[94m|[0m
-[1m[94m69[0m [1m[94m|[0m             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-   [1m[94m|[0m                          [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
-   [1m[94m|[0m
-   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
-   [1m[94m= [0m[1mnote[0m: `-D clippy::io-other-error` implied by `-D warnings`
-   [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::io_other_error)]`
-[1m[96mhelp[0m: use `std::io::Error::other`
-   [1m[94m|[0m
-[1m[94m69[0m [91m- [0m            .map_err(|e| io::Error::[91mnew[0m([91mio::ErrorKind::Other, [0me))?;
-[1m[94m69[0m [92m+ [0m            .map_err(|e| io::Error::[92mother[0m(e))?;
-   [1m[94m|[0m
-
-[1m[91merror[0m[1m: this can be `std::io::Error::other(_)`[0m
-   [1m[94m--> [0msrc/terminal/mod.rs:101:26
-    [1m[94m|[0m
-[1m[94m101[0m [1m[94m|[0m             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    [1m[94m|[0m                          [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
-    [1m[94m|[0m
-    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
-[1m[96mhelp[0m: use `std::io::Error::other`
-    [1m[94m|[0m
-[1m[94m101[0m [91m- [0m            .map_err(|e| io::Error::[91mnew[0m([91mio::ErrorKind::Other, [0me))?;
-[1m[94m101[0m [92m+ [0m            .map_err(|e| io::Error::[92mother[0m(e))?;
-    [1m[94m|[0m
-
-[1m[91merror[0m: could not compile `cera` (lib) due to 4 previous errors
-[1m[33mwarning[0m: build failed, waiting for other jobs to finish...
-[1m[91merror[0m: could not compile `cera` (lib test) due to 4 previous errors
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.56s
 ```
 
 ## Log complet - Build
 ```
-[1m[92m       Fresh[0m libc v0.2.189
 [1m[92m       Fresh[0m cfg-if v1.0.4
+[1m[92m       Fresh[0m libc v0.2.189
 [1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m nix v0.27.1
-[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/view/colors.rs` has changed (1789455771.303895241s, 2h 28m 46s after last build at 1789446845.432723122s)
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/editor/mod.rs` has changed (1789465016.604899984s, 5h 2m 51s after last build at 1789446845.432723122s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7684b1cb7fc3ad41 -C extra-filename=-265f65eb0fbef32c --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rmeta --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rmeta --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rmeta`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=0373c7d690e4aeca -C extra-filename=-4ea6f987a5324741 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.83s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.92s
 ```
 
 ## Log complet - Tests
@@ -100,11 +41,11 @@ Run: https://github.com/kelian-4/cera/actions/runs/34939735460
 [1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m cfg-if v1.0.4
 [1m[92m       Fresh[0m nix v0.27.1
-[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/lib.rs` has changed (1789455771.303150577s, 2h 28m 45s after last build at 1789446846.270981734s)
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/io/file_io.rs` has changed (1789465016.605503951s, 5h 2m 50s after last build at 1789446846.270981734s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=acaf246eb6f4080d -C extra-filename=-61406aa377921b4c --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8b06f7f737320b48 -C extra-filename=-24fe9b87231282b6 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
-[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.68s
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.73s
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-61406aa377921b4c`
 
 running 29 tests
@@ -119,9 +60,10 @@ test io::json::tests::test_json_invalid ... ok
 test io::json::tests::test_json_nested_object ... ok
 test io::json::tests::test_json_parsing ... ok
 test model::buffer::tests::test_delete_char_merges_rows ... ok
+test editor::clipboard::tests::test_clipboard_fallback_roundtrip ... ok
 test model::buffer::tests::test_dirty_flag ... ok
-test model::buffer::tests::test_insert_newline_splits_row ... ok
 test model::buffer::tests::test_to_string_content ... ok
+test model::buffer::tests::test_insert_newline_splits_row ... ok
 test model::row::tests::test_cx_rx_roundtrip ... ok
 test model::row::tests::test_insert_delete ... ok
 test model::row::tests::test_tab_expansion ... ok
@@ -132,13 +74,12 @@ test model::utf8::tests::test_char_index_for_byte_offset ... ok
 test model::utf8::tests::test_codepoint_count ... ok
 test model::utf8::tests::test_display_width_cjk ... ok
 test model::utf8::tests::test_substr_by_char ... ok
-test syntax::tests::test_syntax_selection ... ok
 test syntax::tests::test_update_syntax_keyword ... ok
-test editor::clipboard::tests::test_clipboard_fallback_roundtrip ... ok
+test syntax::tests::test_syntax_selection ... ok
 test view::colors::tests::test_ansi256_white ... ok
 test view::colors::tests::test_true_color_sequence ... ok
 
-test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-24fe9b87231282b6`
 
