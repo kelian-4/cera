@@ -21,7 +21,6 @@ pub struct ViewState<'a> {
     pub status_message_kind: MessageKind,
     pub status_message_age_seconds: i64,
     pub overlay_full_doc: bool,
-    pub show_help_bar: bool,
     pub search: SearchDisplayInfo,
     pub search_term: String,
     pub config: &'a Config,
@@ -76,11 +75,8 @@ pub fn gutter_width(state: &ViewState) -> usize {
 }
 
 pub fn text_area_screen_rows(state: &ViewState) -> usize {
-    let mut reserved = 2usize;
+    let mut reserved = 4usize;
     if state.buffer_manager.count() > 1 {
-        reserved += 1;
-    }
-    if state.show_help_bar {
         reserved += 1;
     }
     state.screenrows.saturating_sub(reserved).max(1)
@@ -252,8 +248,6 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
             " recherche: {} ({}/{})",
             state.search_term, state.search.current_index, state.search.total_matches
         )
-    } else if state.show_help_bar {
-        " ^H fermer l'aide".to_string()
     } else {
         " ^H aide".to_string()
     };
@@ -319,33 +313,50 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
 }
 
 fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
-    if !state.show_help_bar {
-        return;
-    }
-
+    let entries = crate::view::help_text::short_help_entries();
     let separator = "  ";
-    let mut help = String::from(" ");
-    let mut first = true;
-    for entry in crate::view::help_text::short_help_entries() {
-        let candidate_len = help.chars().count()
-            + if first { 0 } else { separator.chars().count() }
+    let mut lines: Vec<String> = vec![String::from(" ")];
+
+    for entry in entries {
+        let current = lines.last_mut().unwrap();
+        let is_first_on_line = current.trim().is_empty();
+        let candidate_len = current.chars().count()
+            + if is_first_on_line {
+                0
+            } else {
+                separator.chars().count()
+            }
             + entry.chars().count();
-        if candidate_len > state.screencols {
-            break;
+
+        if candidate_len > state.screencols && !is_first_on_line {
+            if lines.len() >= 2 {
+                break;
+            }
+            lines.push(String::from(" "));
+            let current = lines.last_mut().unwrap();
+            current.push_str(entry);
+            continue;
         }
-        if !first {
-            help.push_str(separator);
+
+        if !is_first_on_line {
+            current.push_str(separator);
         }
-        help.push_str(entry);
-        first = false;
+        current.push_str(entry);
     }
 
-    let help_len = help.chars().count();
-    ab.append(&help);
-    for _ in help_len..state.screencols {
-        ab.append(" ");
+    while lines.len() < 2 {
+        lines.push(String::new());
     }
-    ab.append("\r\n");
+
+    for line in lines.iter().take(2) {
+        let line_len = line.chars().count().min(state.screencols);
+        let line_trunc: String = line.chars().take(line_len).collect();
+        ab.append(&line_trunc);
+        for _ in line_len..state.screencols {
+            ab.append(" ");
+        }
+        ab.append("\r\n");
+    }
 }
 
 fn draw_message_bar(ab: &mut AppendBuffer, state: &ViewState) {

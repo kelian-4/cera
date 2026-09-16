@@ -20,17 +20,17 @@ pub struct ThemeColors {
 impl Default for ThemeColors {
     fn default() -> Self {
         ThemeColors {
-            normal: 0xD8DEE9,
-            comment: 0x616E88,
-            keyword1: 0x81A1C1,
-            keyword2: 0xA3BE8C,
-            string_color: 0xEBCB8B,
-            number: 0xB48EAD,
-            match_color: 0xFFFF00,
-            line_number_fg: 0x4C566A,
-            error_fg: 0xBF616A,
-            success_fg: 0xA3BE8C,
-            selection_bg: 0x434C5E,
+            normal: 0xF2E9DC,
+            comment: 0xB8A88A,
+            keyword1: 0xFFB86C,
+            keyword2: 0xF1FA8C,
+            string_color: 0xFFD9A0,
+            number: 0xFF9E9E,
+            match_color: 0xFFFF66,
+            line_number_fg: 0xC9A876,
+            error_fg: 0xFF8080,
+            success_fg: 0xB8E994,
+            selection_bg: 0x5A4A3A,
         }
     }
 }

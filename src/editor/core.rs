@@ -33,7 +33,6 @@ pub struct Editor {
 
     quit_times: i32,
 
-    show_help_bar: bool,
     overlay_full_doc: bool,
 
     search_active: bool,
@@ -71,7 +70,6 @@ impl Editor {
             status_message: String::new(),
             status_message_kind: MessageKind::Info,
             status_message_time: std::time::Instant::now(),
-            show_help_bar: false,
             overlay_full_doc: false,
             search_active: false,
             search_term: String::new(),
@@ -115,7 +113,6 @@ impl Editor {
             status_message_kind: self.status_message_kind,
             status_message_age_seconds: self.status_message_time.elapsed().as_secs() as i64,
             overlay_full_doc: self.overlay_full_doc,
-            show_help_bar: self.show_help_bar,
             search,
             search_term: self.search_term.clone(),
             config: &self.config,
@@ -199,7 +196,10 @@ impl Editor {
             terminal::ARROW_RIGHT => {
                 if has_row && cursor.cx < ob.buffer.row(cursor.cy).size() {
                     cursor.cx += 1;
-                } else if has_row && cursor.cx == ob.buffer.row(cursor.cy).size() {
+                } else if has_row
+                    && cursor.cx == ob.buffer.row(cursor.cy).size()
+                    && cursor.cy + 1 < ob.buffer.num_rows()
+                {
                     cursor.cy += 1;
                     cursor.cx = 0;
                 }
@@ -209,7 +209,7 @@ impl Editor {
                     cursor.cy -= 1;
                 }
             }
-            terminal::ARROW_DOWN if cursor.cy < ob.buffer.num_rows() => {
+            terminal::ARROW_DOWN if cursor.cy + 1 < ob.buffer.num_rows() => {
                 cursor.cy += 1;
             }
             _ => {}
@@ -833,10 +833,9 @@ impl Editor {
         };
         self.search_active = true;
         self.search_term.clear();
+        self.set_status_message("");
 
         loop {
-            let msg = format!("Rechercher: {}", self.search_term);
-            self.set_status_message(msg);
             self.refresh_screen();
 
             let c = match self.terminal.read_key() {
@@ -1176,8 +1175,11 @@ impl Editor {
         self.set_status_message("Colle");
     }
 
-    fn toggle_help_bar(&mut self) {
-        self.show_help_bar = !self.show_help_bar;
+    fn go_to_file_start(&mut self) {
+        let ob = self.buffer_manager.active_mut();
+        ob.cursor.cy = 0;
+        ob.cursor.cx = 0;
+        ob.selection.is_active = false;
     }
 
     fn toggle_full_doc(&mut self) {
@@ -1342,7 +1344,7 @@ impl Editor {
             k if k == ctrl('l') => self.goto_line(),
             k if k == ctrl('n') => self.buffer_manager.next(),
             k if k == ctrl('p') => self.buffer_manager.previous(),
-            k if k == ctrl('h') => self.toggle_help_bar(),
+            k if k == ctrl('h') => self.go_to_file_start(),
             k if k == ctrl('d') => self.toggle_full_doc(),
             k if k == ctrl('k') => self.cut_current_line(),
 
@@ -1369,13 +1371,11 @@ impl Editor {
                 let text_rows = screen_renderer::text_area_screen_rows(&state);
 
                 let ob = self.buffer_manager.active_mut();
+                let last_row = ob.buffer.num_rows().saturating_sub(1);
                 if c == terminal::PAGE_UP {
-                    ob.cursor.cy = ob.rowoff;
+                    ob.cursor.cy = ob.rowoff.min(last_row);
                 } else {
-                    ob.cursor.cy = ob.rowoff + text_rows - 1;
-                    if ob.cursor.cy > ob.buffer.num_rows() {
-                        ob.cursor.cy = ob.buffer.num_rows();
-                    }
+                    ob.cursor.cy = (ob.rowoff + text_rows.saturating_sub(1)).min(last_row);
                 }
 
                 let dir = if c == terminal::PAGE_UP {

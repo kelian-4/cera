@@ -62,7 +62,7 @@ pub fn matches(syntax: &Syntax, filename: &str) -> bool {
 }
 
 fn is_separator(c: char) -> bool {
-    c.is_whitespace() || c == '\0' || ",.()+-/*=~%<>[];".contains(c)
+    c.is_whitespace() || c == '\0' || ",.()+-/*=~%<>[]{};:!&|".contains(c)
 }
 
 fn is_keyword2(kw: &str) -> bool {
