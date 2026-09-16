@@ -741,8 +741,7 @@ impl Editor {
                 .render()
                 .to_string();
             let mut search_from = 0usize;
-            while let Some(pos) = render[search_from..].find(&term) {
-                let abs_pos = search_from + pos;
+            while let Some(abs_pos) = utf8::find_word_bounded(&render, &term, search_from) {
                 self.search_total_matches += 1;
 
                 match r.cmp(&cursor_row) {
@@ -793,8 +792,7 @@ impl Editor {
                 let from_col = if row == start_row { start_col + 1 } else { 0 };
                 let byte_from = utf8::byte_offset_for_char_index(&render, from_col);
                 if byte_from <= render.len() {
-                    if let Some(pos) = render[byte_from..].find(&term) {
-                        let abs_pos = byte_from + pos;
+                    if let Some(abs_pos) = utf8::find_word_bounded(&render, &term, byte_from) {
                         let ob = self.buffer_manager.active_mut();
                         ob.cursor.cy = row;
                         ob.cursor.cx = utf8::char_index_for_byte_offset(&render, abs_pos);
@@ -809,22 +807,7 @@ impl Editor {
                     self.buffer_manager.active().buffer.row(row).size() + 1
                 };
                 let byte_upto = utf8::byte_offset_for_char_index(&render, upto).min(render.len());
-                let mut last_pos: Option<usize> = None;
-                let mut search_pos = 0usize;
-                while search_pos < byte_upto {
-                    match render[search_pos..].find(&term) {
-                        Some(p) => {
-                            let abs = search_pos + p;
-                            if abs >= byte_upto {
-                                break;
-                            }
-                            last_pos = Some(abs);
-                            search_pos = abs + 1;
-                        }
-                        None => break,
-                    }
-                }
-                if let Some(pos) = last_pos {
+                if let Some(pos) = utf8::rfind_word_bounded(&render, &term, byte_upto) {
                     let ob = self.buffer_manager.active_mut();
                     ob.cursor.cy = row;
                     ob.cursor.cx = utf8::char_index_for_byte_offset(&render, pos);
@@ -961,8 +944,8 @@ impl Editor {
                     .row(r)
                     .render()
                     .to_string();
-                let pos = match render[search_from_byte..].find(&search_term) {
-                    Some(p) => search_from_byte + p,
+                let pos = match utf8::find_word_bounded(&render, &search_term, search_from_byte) {
+                    Some(p) => p,
                     None => break,
                 };
 
@@ -1203,20 +1186,25 @@ impl Editor {
 
     fn handle_mouse_event(&mut self, ev: MouseEvent) {
         if ev.is_wheel {
-            let search = SearchDisplayInfo::default();
-            let state = self.build_view_state(search);
-            let text_rows = screen_renderer::text_area_screen_rows(&state);
             let ob = self.buffer_manager.active_mut();
-            let delta = ev.wheel_delta * 3;
-            if delta < 0 {
-                ob.rowoff = ob.rowoff.saturating_sub((-delta) as usize);
+            if ob.buffer.num_rows() == 0 {
+                return;
+            }
+            let lines_per_step = 3i32;
+            let delta = ev.wheel_delta * lines_per_step;
+
+            let new_cy = if delta < 0 {
+                ob.cursor.cy.saturating_sub((-delta) as usize)
             } else {
-                ob.rowoff += delta as usize;
+                (ob.cursor.cy + delta as usize).min(ob.buffer.num_rows() - 1)
+            };
+
+            ob.cursor.cy = new_cy;
+            let row_len = ob.buffer.row(new_cy).size();
+            if ob.cursor.cx > row_len {
+                ob.cursor.cx = row_len;
             }
-            let max_off = ob.buffer.num_rows().saturating_sub(text_rows);
-            if ob.rowoff > max_off {
-                ob.rowoff = max_off;
-            }
+            ob.selection.is_active = false;
             return;
         }
 

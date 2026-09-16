@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
+use std::thread;
 
 pub struct Clipboard {
     system_tool_available: bool,
@@ -98,33 +99,27 @@ impl Clipboard {
             return false;
         }
 
-        let child = Command::new(&self.copy_program)
-            .args(&self.copy_args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
+        let program = self.copy_program.clone();
+        let args = self.copy_args.clone();
+        let text_owned = text.to_string();
 
-        let mut child = match child {
-            Ok(c) => c,
-            Err(_) => {
-                self.system_tool_available = false;
-                return false;
+        thread::spawn(move || {
+            let child = Command::new(&program)
+                .args(&args)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn();
+
+            if let Ok(mut child) = child {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = stdin.write_all(text_owned.as_bytes());
+                }
+                let _ = child.wait();
             }
-        };
+        });
 
-        let write_ok = if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(text.as_bytes()).is_ok()
-        } else {
-            false
-        };
-
-        let _ = child.wait();
-
-        if !write_ok {
-            self.system_tool_available = false;
-        }
-        write_ok
+        true
     }
 
     pub fn paste(&mut self) -> String {

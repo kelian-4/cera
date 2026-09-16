@@ -19,6 +19,26 @@ pub fn short_help_line() -> &'static str {
     "^H aide  ^S sauver  ^Q quitter  ^F chercher  ^R remplacer  ^Z annuler  ^Y retablir  ^K couper ligne"
 }
 
+pub fn short_help_entries() -> &'static [&'static str] {
+    &[
+        "^H aide",
+        "^S sauver",
+        "^Q quitter",
+        "^F chercher",
+        "^R remplacer",
+        "^Z annuler",
+        "^Y retablir",
+        "^X couper",
+        "^C copier",
+        "^V coller",
+        "^K couper ligne",
+        "^L aller a la ligne",
+        "^N tampon suivant",
+        "^P tampon precedent",
+        "^D documentation",
+    ]
+}
+
 pub fn full_documentation() -> &'static [HelpCategory] {
     &[
         HelpCategory {

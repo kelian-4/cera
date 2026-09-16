@@ -2,7 +2,7 @@ use crate::editor::buffer_manager::BufferManager;
 use crate::io::config::Config;
 use crate::model::selection::Position;
 use crate::view::colors::{bg_sequence, fg_sequence, reset_fg_sequence};
-use crate::view::help_text::{full_documentation, short_help_line, MessageKind};
+use crate::view::help_text::{full_documentation, MessageKind};
 
 #[derive(Clone, Copy, Default)]
 pub struct SearchDisplayInfo {
@@ -162,15 +162,10 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
                 let welcome_len = welcome.chars().count().min(text_cols);
                 let welcome: String = welcome.chars().take(welcome_len).collect();
                 let padding = (text_cols.saturating_sub(welcome_len)) / 2;
-                if padding > 0 {
-                    ab.append("~");
-                    for _ in 0..padding.saturating_sub(1) {
-                        ab.append(" ");
-                    }
+                for _ in 0..padding {
+                    ab.append(" ");
                 }
                 ab.append(&welcome);
-            } else {
-                ab.append("~");
             }
         } else {
             let row = buffer.row(filerow);
@@ -257,6 +252,8 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
             " recherche: {} ({}/{})",
             state.search_term, state.search.current_index, state.search.total_matches
         )
+    } else if state.show_help_bar {
+        " ^H fermer l'aide".to_string()
     } else {
         " ^H aide".to_string()
     };
@@ -271,7 +268,14 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     }
 
     let total_lines = buffer.num_rows().max(1);
-    let right = format!("{}/{} ", ob.cursor.cy + 1, total_lines);
+    let percent = ((ob.cursor.cy + 1) * 100) / total_lines;
+    let bar_width = 10usize;
+    let filled = (percent * bar_width) / 100;
+    let mut bar = String::with_capacity(bar_width);
+    for i in 0..bar_width {
+        bar.push(if i < filled { '█' } else { '░' });
+    }
+    let right = format!("{} {}/{} ", bar, ob.cursor.cy + 1, total_lines);
 
     let total = state.screencols;
     let left_len = left.chars().count().min(total);
@@ -319,10 +323,25 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
         return;
     }
 
-    let help = format!(" {}", short_help_line());
-    let help_len = help.chars().count().min(state.screencols);
-    let help_trunc: String = help.chars().take(help_len).collect();
-    ab.append(&help_trunc);
+    let separator = "  ";
+    let mut help = String::from(" ");
+    let mut first = true;
+    for entry in crate::view::help_text::short_help_entries() {
+        let candidate_len = help.chars().count()
+            + if first { 0 } else { separator.chars().count() }
+            + entry.chars().count();
+        if candidate_len > state.screencols {
+            break;
+        }
+        if !first {
+            help.push_str(separator);
+        }
+        help.push_str(entry);
+        first = false;
+    }
+
+    let help_len = help.chars().count();
+    ab.append(&help);
     for _ in help_len..state.screencols {
         ab.append(" ");
     }
