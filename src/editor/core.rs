@@ -34,6 +34,8 @@ pub struct Editor {
     quit_times: i32,
 
     overlay_full_doc: bool,
+    help_active: bool,
+    prompt_text: Option<String>,
 
     search_active: bool,
     search_term: String,
@@ -71,6 +73,8 @@ impl Editor {
             status_message_kind: MessageKind::Info,
             status_message_time: std::time::Instant::now(),
             overlay_full_doc: false,
+            help_active: false,
+            prompt_text: None,
             search_active: false,
             search_term: String::new(),
             search_current_match: 0,
@@ -113,6 +117,8 @@ impl Editor {
             status_message_kind: self.status_message_kind,
             status_message_age_seconds: self.status_message_time.elapsed().as_secs() as i64,
             overlay_full_doc: self.overlay_full_doc,
+            help_active: self.help_active,
+            prompt_text: self.prompt_text.clone(),
             search,
             search_term: self.search_term.clone(),
             config: &self.config,
@@ -668,7 +674,7 @@ impl Editor {
 
         loop {
             let msg = prompt_fmt.replace("%s", &buf);
-            self.set_status_message(msg);
+            self.prompt_text = Some(msg);
             self.refresh_screen();
 
             let c = match self.terminal.read_key() {
@@ -684,11 +690,11 @@ impl Editor {
             if c == terminal::DEL_KEY || c == ctrl('h') || c == terminal::BACKSPACE {
                 buf.pop();
             } else if c == 0x1b {
-                self.set_status_message("");
+                self.prompt_text = None;
                 return None;
             } else if c == '\r' as i32 {
                 if !buf.is_empty() {
-                    self.set_status_message("");
+                    self.prompt_text = None;
                     return Some(buf);
                 }
             } else if terminal::is_encoded_codepoint(c) {
@@ -967,11 +973,12 @@ impl Editor {
                     self.search_active = true;
                     self.search_term = search_term.clone();
                     self.update_find_highlight();
-                    self.refresh_screen();
 
-                    self.set_status_message(
-                        "Remplacer cette occurrence ? (o)ui / (n)on / (t)out / Echap pour arreter",
+                    let confirm_msg = format!(
+                        "Remplacer \"{}\" ? (o)ui / (n)on / (t)out / Echap pour arreter",
+                        search_term
                     );
+                    self.prompt_text = Some(confirm_msg);
                     self.refresh_screen();
 
                     let mut key = terminal::NO_KEY;
@@ -982,6 +989,7 @@ impl Editor {
                         }
                     }
                     self.search_active = false;
+                    self.prompt_text = None;
 
                     if key == 0x1b {
                         self.clear_find_highlight();
@@ -1181,11 +1189,8 @@ impl Editor {
         self.set_status_message("Colle");
     }
 
-    fn go_to_file_start(&mut self) {
-        let ob = self.buffer_manager.active_mut();
-        ob.cursor.cy = 0;
-        ob.cursor.cx = 0;
-        ob.selection.is_active = false;
+    fn toggle_help(&mut self) {
+        self.help_active = !self.help_active;
     }
 
     fn toggle_full_doc(&mut self) {
@@ -1350,7 +1355,7 @@ impl Editor {
             k if k == ctrl('l') => self.goto_line(),
             k if k == ctrl('n') => self.buffer_manager.next(),
             k if k == ctrl('p') => self.buffer_manager.previous(),
-            k if k == ctrl('h') => self.go_to_file_start(),
+            k if k == ctrl('h') => self.toggle_help(),
             k if k == ctrl('d') => self.toggle_full_doc(),
             k if k == ctrl('k') => self.cut_current_line(),
 

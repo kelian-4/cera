@@ -24,7 +24,7 @@ pub fn short_help_entries() -> &'static [ShortHelpEntry] {
     &[
         ShortHelpEntry {
             key: "^H",
-            label: "debut",
+            label: "aide",
         },
         ShortHelpEntry {
             key: "^S",
@@ -173,7 +173,7 @@ pub fn full_documentation() -> &'static [HelpCategory] {
             entries: &[
                 HelpEntry {
                     shortcut: "Ctrl-H",
-                    description: "Aller au debut du fichier",
+                    description: "Afficher/masquer le bandeau d'aide",
                 },
                 HelpEntry {
                     shortcut: "Ctrl-D",
