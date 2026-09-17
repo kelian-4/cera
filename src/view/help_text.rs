@@ -15,27 +15,73 @@ pub struct HelpCategory {
     pub entries: &'static [HelpEntry],
 }
 
-pub fn short_help_line() -> &'static str {
-    "^H aide  ^S sauver  ^Q quitter  ^F chercher  ^R remplacer  ^Z annuler  ^Y retablir  ^K couper ligne"
+pub struct ShortHelpEntry {
+    pub key: &'static str,
+    pub label: &'static str,
 }
 
-pub fn short_help_entries() -> &'static [&'static str] {
+pub fn short_help_entries() -> &'static [ShortHelpEntry] {
     &[
-        "^H aide",
-        "^S sauver",
-        "^Q quitter",
-        "^F chercher",
-        "^R remplacer",
-        "^Z annuler",
-        "^Y retablir",
-        "^X couper",
-        "^C copier",
-        "^V coller",
-        "^K couper ligne",
-        "^L aller a la ligne",
-        "^N tampon suivant",
-        "^P tampon precedent",
-        "^D documentation",
+        ShortHelpEntry {
+            key: "^H",
+            label: "debut",
+        },
+        ShortHelpEntry {
+            key: "^S",
+            label: "sauver",
+        },
+        ShortHelpEntry {
+            key: "^Q",
+            label: "quitter",
+        },
+        ShortHelpEntry {
+            key: "^F",
+            label: "chercher",
+        },
+        ShortHelpEntry {
+            key: "^R",
+            label: "remplacer",
+        },
+        ShortHelpEntry {
+            key: "^Z",
+            label: "annuler",
+        },
+        ShortHelpEntry {
+            key: "^Y",
+            label: "retablir",
+        },
+        ShortHelpEntry {
+            key: "^X",
+            label: "couper",
+        },
+        ShortHelpEntry {
+            key: "^C",
+            label: "copier",
+        },
+        ShortHelpEntry {
+            key: "^V",
+            label: "coller",
+        },
+        ShortHelpEntry {
+            key: "^K",
+            label: "couper ligne",
+        },
+        ShortHelpEntry {
+            key: "^L",
+            label: "aller a la ligne",
+        },
+        ShortHelpEntry {
+            key: "^N",
+            label: "tampon suivant",
+        },
+        ShortHelpEntry {
+            key: "^P",
+            label: "tampon precedent",
+        },
+        ShortHelpEntry {
+            key: "^D",
+            label: "documentation",
+        },
     ]
 }
 
@@ -127,7 +173,7 @@ pub fn full_documentation() -> &'static [HelpCategory] {
             entries: &[
                 HelpEntry {
                     shortcut: "Ctrl-H",
-                    description: "Afficher/masquer le bandeau d'aide",
+                    description: "Aller au debut du fichier",
                 },
                 HelpEntry {
                     shortcut: "Ctrl-D",

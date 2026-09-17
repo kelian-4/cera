@@ -314,38 +314,39 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
 
 fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let entries = crate::view::help_text::short_help_entries();
-    let separator = "  ";
-    let mut lines: Vec<String> = vec![String::from(" ")];
 
-    for entry in entries {
-        let current = lines.last_mut().unwrap();
-        let is_first_on_line = current.trim().is_empty();
-        let candidate_len = current.chars().count()
-            + if is_first_on_line {
-                0
-            } else {
-                separator.chars().count()
-            }
-            + entry.chars().count();
+    let min_column_width = 12usize;
+    let columns_per_line = (state.screencols / min_column_width).max(1);
+    let column_width = state.screencols / columns_per_line;
 
-        if candidate_len > state.screencols && !is_first_on_line {
-            if lines.len() >= 2 {
-                break;
-            }
-            lines.push(String::from(" "));
-            let current = lines.last_mut().unwrap();
-            current.push_str(entry);
+    let mut lines: Vec<String> = vec![String::new(), String::new()];
+    let max_entries = columns_per_line * 2;
+
+    for (i, entry) in entries.iter().take(max_entries).enumerate() {
+        let line_idx = i % 2;
+        let cell = format!("{} {}", entry.key, entry.label);
+
+        let remaining = state
+            .screencols
+            .saturating_sub(lines[line_idx].chars().count());
+        if remaining == 0 {
             continue;
         }
 
-        if !is_first_on_line {
-            current.push_str(separator);
-        }
-        current.push_str(entry);
-    }
+        let target_width = column_width.min(remaining);
+        let cell_len = cell.chars().count();
 
-    while lines.len() < 2 {
-        lines.push(String::new());
+        let cell_final: String = if cell_len > target_width {
+            cell.chars().take(target_width).collect()
+        } else {
+            let mut padded = cell.clone();
+            for _ in cell_len..target_width {
+                padded.push(' ');
+            }
+            padded
+        };
+
+        lines[line_idx].push_str(&cell_final);
     }
 
     for line in lines.iter().take(2) {

@@ -10,7 +10,7 @@ use crate::model::selection::Position;
 use crate::model::utf8;
 use crate::syntax;
 use crate::terminal::{self, MouseEvent, Terminal};
-use crate::view::help_text::{short_help_line, MessageKind};
+use crate::view::help_text::MessageKind;
 use crate::view::screen_renderer::{self, SearchDisplayInfo, ViewState};
 
 fn ctrl(c: char) -> i32 {
@@ -163,8 +163,6 @@ impl Editor {
     }
 
     pub fn run(&mut self) -> ! {
-        self.set_status_message(short_help_line());
-
         loop {
             self.refresh_screen();
             self.process_keypress();
@@ -779,7 +777,9 @@ impl Editor {
         let term = self.search_term.clone();
 
         let mut row = start_row;
-        for _ in 0..=num_rows {
+        for step in 0..=num_rows {
+            let is_first_pass = step == 0;
+            let is_final_wrap = step == num_rows;
             let render = self
                 .buffer_manager
                 .active()
@@ -789,30 +789,36 @@ impl Editor {
                 .to_string();
 
             if direction > 0 {
-                let from_col = if row == start_row { start_col + 1 } else { 0 };
+                let from_col = if is_first_pass { start_col + 1 } else { 0 };
                 let byte_from = utf8::byte_offset_for_char_index(&render, from_col);
                 if byte_from <= render.len() {
                     if let Some(abs_pos) = utf8::find_word_bounded(&render, &term, byte_from) {
-                        let ob = self.buffer_manager.active_mut();
-                        ob.cursor.cy = row;
-                        ob.cursor.cx = utf8::char_index_for_byte_offset(&render, abs_pos);
-                        self.update_find_highlight();
-                        return;
+                        let match_col = utf8::char_index_for_byte_offset(&render, abs_pos);
+                        if !(is_final_wrap && match_col > start_col) {
+                            let ob = self.buffer_manager.active_mut();
+                            ob.cursor.cy = row;
+                            ob.cursor.cx = match_col;
+                            self.update_find_highlight();
+                            return;
+                        }
                     }
                 }
             } else {
-                let upto = if row == start_row {
+                let upto = if is_first_pass {
                     start_col
                 } else {
                     self.buffer_manager.active().buffer.row(row).size() + 1
                 };
                 let byte_upto = utf8::byte_offset_for_char_index(&render, upto).min(render.len());
                 if let Some(pos) = utf8::rfind_word_bounded(&render, &term, byte_upto) {
-                    let ob = self.buffer_manager.active_mut();
-                    ob.cursor.cy = row;
-                    ob.cursor.cx = utf8::char_index_for_byte_offset(&render, pos);
-                    self.update_find_highlight();
-                    return;
+                    let match_col = utf8::char_index_for_byte_offset(&render, pos);
+                    if !(is_final_wrap && match_col < start_col) {
+                        let ob = self.buffer_manager.active_mut();
+                        ob.cursor.cy = row;
+                        ob.cursor.cx = match_col;
+                        self.update_find_highlight();
+                        return;
+                    }
                 }
             }
 
