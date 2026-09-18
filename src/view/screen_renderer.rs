@@ -250,9 +250,10 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     }
 
     let entries = crate::view::help_text::short_help_entries();
-    let min_column_width = 12usize;
+    let min_column_width = 13usize;
     let columns_per_line = (state.screencols / min_column_width).max(1);
     let column_width = state.screencols / columns_per_line;
+    let text_width = column_width.saturating_sub(1).max(1);
 
     let mut lines: Vec<String> = vec![String::new(), String::new()];
     let max_entries = columns_per_line * 2;
@@ -268,18 +269,21 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
             continue;
         }
 
-        let target_width = column_width.min(remaining);
         let cell_len = cell.chars().count();
-
-        let cell_final: String = if cell_len > target_width {
-            cell.chars().take(target_width).collect()
+        let text_part: String = if cell_len > text_width {
+            cell.chars().take(text_width).collect()
         } else {
-            let mut padded = cell.clone();
-            for _ in cell_len..target_width {
-                padded.push(' ');
-            }
-            padded
+            cell.clone()
         };
+
+        let mut cell_final = text_part;
+        let total_width = column_width.min(remaining);
+        while cell_final.chars().count() < total_width {
+            cell_final.push(' ');
+        }
+        if cell_final.chars().count() > remaining {
+            cell_final = cell_final.chars().take(remaining).collect();
+        }
 
         lines[line_idx].push_str(&cell_final);
     }

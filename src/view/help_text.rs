@@ -23,10 +23,6 @@ pub struct ShortHelpEntry {
 pub fn short_help_entries() -> &'static [ShortHelpEntry] {
     &[
         ShortHelpEntry {
-            key: "^H",
-            label: "aide",
-        },
-        ShortHelpEntry {
             key: "^S",
             label: "sauver",
         },
