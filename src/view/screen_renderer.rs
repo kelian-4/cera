@@ -81,6 +81,9 @@ pub fn text_area_screen_rows(state: &ViewState) -> usize {
     if state.buffer_manager.count() > 1 {
         reserved += 1;
     }
+    if state.help_active {
+        reserved += 2;
+    }
     state.screenrows.saturating_sub(reserved).max(1)
 }
 
@@ -241,49 +244,58 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
     }
 }
 
-fn draw_help_line(ab: &mut AppendBuffer, state: &ViewState) {
-    let entries = crate::view::help_text::short_help_entries();
-    let separator = "  ";
-    let mut line = String::from(" ");
-    let mut first = true;
-
-    for entry in entries {
-        let cell = format!("{} {}", entry.key, entry.label);
-        let candidate_len = line.chars().count()
-            + if first { 0 } else { separator.chars().count() }
-            + cell.chars().count();
-
-        if candidate_len > state.screencols {
-            if first {
-                let remaining = state.screencols.saturating_sub(line.chars().count());
-                let cell_trunc: String = cell.chars().take(remaining).collect();
-                line.push_str(&cell_trunc);
-            }
-            break;
-        }
-
-        if !first {
-            line.push_str(separator);
-        }
-        line.push_str(&cell);
-        first = false;
-    }
-
-    let line_len = line.chars().count().min(state.screencols);
-    let line_trunc: String = line.chars().take(line_len).collect();
-    ab.append(&line_trunc);
-    for _ in line_len..state.screencols {
-        ab.append(" ");
-    }
-    ab.append("\r\n");
-}
-
-fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
-    if state.help_active {
-        draw_help_line(ab, state);
+fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
+    if !state.help_active {
         return;
     }
 
+    let entries = crate::view::help_text::short_help_entries();
+    let min_column_width = 12usize;
+    let columns_per_line = (state.screencols / min_column_width).max(1);
+    let column_width = state.screencols / columns_per_line;
+
+    let mut lines: Vec<String> = vec![String::new(), String::new()];
+    let max_entries = columns_per_line * 2;
+
+    for (i, entry) in entries.iter().take(max_entries).enumerate() {
+        let line_idx = i % 2;
+        let cell = format!("{} {}", entry.key, entry.label);
+
+        let remaining = state
+            .screencols
+            .saturating_sub(lines[line_idx].chars().count());
+        if remaining == 0 {
+            continue;
+        }
+
+        let target_width = column_width.min(remaining);
+        let cell_len = cell.chars().count();
+
+        let cell_final: String = if cell_len > target_width {
+            cell.chars().take(target_width).collect()
+        } else {
+            let mut padded = cell.clone();
+            for _ in cell_len..target_width {
+                padded.push(' ');
+            }
+            padded
+        };
+
+        lines[line_idx].push_str(&cell_final);
+    }
+
+    for line in lines.iter().take(2) {
+        let line_len = line.chars().count().min(state.screencols);
+        let line_trunc: String = line.chars().take(line_len).collect();
+        ab.append(&line_trunc);
+        for _ in line_len..state.screencols {
+            ab.append(" ");
+        }
+        ab.append("\r\n");
+    }
+}
+
+fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     if let Some(prompt_text) = &state.prompt_text {
         let line = format!(" {}", prompt_text);
         let line_len = line.chars().count().min(state.screencols);
@@ -453,6 +465,7 @@ pub fn refresh(state: &ViewState) -> String {
     draw_tab_bar(&mut ab, state);
     draw_rows(&mut ab, state);
     draw_status_bar(&mut ab, state);
+    draw_help_bar(&mut ab, state);
     draw_message_bar(&mut ab, state);
 
     let ob = state.buffer_manager.active();
