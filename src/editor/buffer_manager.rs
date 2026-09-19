@@ -72,7 +72,6 @@ impl BufferManager {
 
     pub fn open_file(&mut self, filename: &str, syntax_db: &[Syntax]) -> usize {
         let reuse_first = self.buffers.len() == 1
-            && self.buffers[0].buffer.num_rows() == 0
             && self.buffers[0].buffer.filename().is_none()
             && !self.buffers[0].buffer.dirty();
 

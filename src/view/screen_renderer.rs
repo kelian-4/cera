@@ -158,7 +158,8 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
         }
 
         if filerow >= buffer.num_rows() {
-            if buffer.num_rows() == 0 && y == text_rows / 3 {
+            let is_single_empty_line = buffer.num_rows() == 1 && buffer.row(0).chars().is_empty();
+            if is_single_empty_line && y == text_rows / 3 {
                 let welcome = "Cera editor -- version 0.1.0";
                 let welcome_len = welcome.chars().count().min(text_cols);
                 let welcome: String = welcome.chars().take(welcome_len).collect();
@@ -256,6 +257,7 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let text_width = column_width.saturating_sub(1).max(1);
 
     let mut lines: Vec<String> = vec![String::new(), String::new()];
+    let mut line_columns: Vec<usize> = vec![0, 0];
     let max_entries = columns_per_line * 2;
 
     for (i, entry) in entries.iter().take(max_entries).enumerate() {
@@ -286,13 +288,25 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
         }
 
         lines[line_idx].push_str(&cell_final);
+        line_columns[line_idx] += 1;
     }
 
+    let used_columns = line_columns.iter().copied().max().unwrap_or(0);
+    let used_width = used_columns * column_width;
+    let left_padding = state.screencols.saturating_sub(used_width) / 2;
+
     for line in lines.iter().take(2) {
-        let line_len = line.chars().count().min(state.screencols);
-        let line_trunc: String = line.chars().take(line_len).collect();
+        let content_len = line.chars().count();
+        let trimmed: String = line.chars().take(content_len).collect();
+
+        for _ in 0..left_padding {
+            ab.append(" ");
+        }
+        let available = state.screencols.saturating_sub(left_padding);
+        let line_len = trimmed.chars().count().min(available);
+        let line_trunc: String = trimmed.chars().take(line_len).collect();
         ab.append(&line_trunc);
-        for _ in line_len..state.screencols {
+        for _ in (left_padding + line_len)..state.screencols {
             ab.append(" ");
         }
         ab.append("\r\n");
