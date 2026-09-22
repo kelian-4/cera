@@ -1,5 +1,9 @@
 use crate::model::selection::Position;
 
+fn is_word_boundary_text(text: &str) -> bool {
+    text.chars().any(|c| c.is_whitespace())
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum EditKind {
     InsertChar,
@@ -75,6 +79,13 @@ impl UndoStack {
             && next.inserted_text.is_empty();
 
         if !same_kind || !(simple_insert || simple_backspace || simple_forward_delete) {
+            return false;
+        }
+
+        if is_word_boundary_text(&next.inserted_text) || is_word_boundary_text(&next.removed_text) {
+            return false;
+        }
+        if is_word_boundary_text(&last.inserted_text) || is_word_boundary_text(&last.removed_text) {
             return false;
         }
 
@@ -181,5 +192,40 @@ mod tests {
         };
         stack.push(a3);
         assert!(!stack.can_redo());
+    }
+
+    fn insert_char_action(row: usize, col: usize, c: char) -> EditAction {
+        EditAction {
+            kind: EditKind::InsertChar,
+            start: Position::new(row, col),
+            inserted_text: c.to_string(),
+            cursor_before: Position::new(row, col),
+            cursor_after: Position::new(row, col + 1),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_coalescing_breaks_on_word_boundary() {
+        let mut stack = UndoStack::new();
+
+        for (i, c) in "hello".chars().enumerate() {
+            stack.push(insert_char_action(0, i, c));
+        }
+        stack.push(insert_char_action(0, 5, ' '));
+        for (i, c) in "world".chars().enumerate() {
+            stack.push(insert_char_action(0, 6 + i, c));
+        }
+
+        let undone1 = stack.undo().unwrap();
+        assert_eq!(undone1.inserted_text, "world");
+
+        let undone2 = stack.undo().unwrap();
+        assert_eq!(undone2.inserted_text, " ");
+
+        let undone3 = stack.undo().unwrap();
+        assert_eq!(undone3.inserted_text, "hello");
+
+        assert!(!stack.can_undo());
     }
 }

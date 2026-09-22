@@ -49,7 +49,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             tab_stop: 8,
-            quit_times: 3,
+            quit_times: 1,
             true_color: true,
             show_line_numbers: true,
             mouse_enabled: true,
@@ -156,7 +156,7 @@ mod tests {
         let (cfg, loaded) = load_from_file("/nonexistent/path/config.json");
         assert!(!loaded);
         assert_eq!(cfg.tab_stop, 8);
-        assert_eq!(cfg.quit_times, 3);
+        assert_eq!(cfg.quit_times, 1);
     }
 
     #[test]

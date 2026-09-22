@@ -68,64 +68,22 @@ pub fn substr_by_char(s: &str, from_char_idx: usize, to_char_idx: usize) -> Stri
         .collect()
 }
 
-fn is_word_boundary_char(c: Option<char>) -> bool {
-    match c {
-        None => true,
-        Some(ch) => ch.is_whitespace(),
-    }
-}
-
-pub fn find_word_bounded(haystack: &str, needle: &str, from_byte: usize) -> Option<usize> {
+pub fn find_pattern(haystack: &str, needle: &str, from_byte: usize) -> Option<usize> {
     if needle.is_empty() || from_byte > haystack.len() {
         return None;
     }
-
-    let mut search_from = from_byte;
-    while let Some(rel_pos) = haystack.get(search_from..).and_then(|s| s.find(needle)) {
-        let abs_pos = search_from + rel_pos;
-        let before = haystack[..abs_pos].chars().next_back();
-        let after_offset = abs_pos + needle.len();
-        let after = haystack.get(after_offset..).and_then(|s| s.chars().next());
-
-        if is_word_boundary_char(before) && is_word_boundary_char(after) {
-            return Some(abs_pos);
-        }
-
-        search_from = abs_pos + needle.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
-    }
-
-    None
+    haystack
+        .get(from_byte..)
+        .and_then(|s| s.find(needle))
+        .map(|p| from_byte + p)
 }
 
-pub fn rfind_word_bounded(haystack: &str, needle: &str, before_byte: usize) -> Option<usize> {
+pub fn rfind_pattern_before(haystack: &str, needle: &str, before_byte: usize) -> Option<usize> {
     if needle.is_empty() {
         return None;
     }
-
     let limit = before_byte.min(haystack.len());
-    let mut last_match: Option<usize> = None;
-    let mut search_from = 0usize;
-
-    while let Some(rel_pos) = haystack
-        .get(search_from..limit)
-        .and_then(|s| s.find(needle))
-    {
-        let abs_pos = search_from + rel_pos;
-        if abs_pos >= limit {
-            break;
-        }
-        let before = haystack[..abs_pos].chars().next_back();
-        let after_offset = abs_pos + needle.len();
-        let after = haystack.get(after_offset..).and_then(|s| s.chars().next());
-
-        if is_word_boundary_char(before) && is_word_boundary_char(after) {
-            last_match = Some(abs_pos);
-        }
-
-        search_from = abs_pos + needle.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
-    }
-
-    last_match
+    haystack.get(..limit).and_then(|s| s.rfind(needle))
 }
 
 #[cfg(test)]
@@ -169,28 +127,27 @@ mod tests {
     }
 
     #[test]
-    fn test_find_word_bounded_excludes_substring() {
+    fn test_find_pattern_matches_as_substring() {
         let s = "monon non";
-        assert_eq!(find_word_bounded(s, "non", 0), Some(6));
+        assert_eq!(find_pattern(s, "non", 0), Some(2));
     }
 
     #[test]
-    fn test_find_word_bounded_matches_at_start_and_end() {
-        assert_eq!(find_word_bounded("non", "non", 0), Some(0));
-        assert_eq!(find_word_bounded("hello non", "non", 0), Some(6));
-        assert_eq!(find_word_bounded("non hello", "non", 0), Some(0));
+    fn test_find_pattern_matches_inside_larger_word() {
+        assert_eq!(find_pattern("monon", "non", 0), Some(2));
+        assert_eq!(find_pattern("nonmono", "non", 0), Some(0));
     }
 
     #[test]
-    fn test_find_word_bounded_no_match_in_larger_word() {
-        assert_eq!(find_word_bounded("monon", "non", 0), None);
-        assert_eq!(find_word_bounded("nonmono", "non", 0), None);
-    }
-
-    #[test]
-    fn test_rfind_word_bounded() {
+    fn test_find_pattern_advances_from_offset() {
         let s = "non monon non";
-        assert_eq!(rfind_word_bounded(s, "non", 13), Some(10));
-        assert_eq!(rfind_word_bounded(s, "non", 5), Some(0));
+        assert_eq!(find_pattern(s, "non", 1), Some(6));
+    }
+
+    #[test]
+    fn test_rfind_pattern_before() {
+        let s = "non monon non";
+        assert_eq!(rfind_pattern_before(s, "non", 13), Some(10));
+        assert_eq!(rfind_pattern_before(s, "non", 5), Some(0));
     }
 }

@@ -745,7 +745,7 @@ impl Editor {
                 .render()
                 .to_string();
             let mut search_from = 0usize;
-            while let Some(abs_pos) = utf8::find_word_bounded(&render, &term, search_from) {
+            while let Some(abs_pos) = utf8::find_pattern(&render, &term, search_from) {
                 self.search_total_matches += 1;
 
                 match r.cmp(&cursor_row) {
@@ -798,7 +798,7 @@ impl Editor {
                 let from_col = if is_first_pass { start_col + 1 } else { 0 };
                 let byte_from = utf8::byte_offset_for_char_index(&render, from_col);
                 if byte_from <= render.len() {
-                    if let Some(abs_pos) = utf8::find_word_bounded(&render, &term, byte_from) {
+                    if let Some(abs_pos) = utf8::find_pattern(&render, &term, byte_from) {
                         let match_col = utf8::char_index_for_byte_offset(&render, abs_pos);
                         if !(is_final_wrap && match_col > start_col) {
                             let ob = self.buffer_manager.active_mut();
@@ -816,7 +816,7 @@ impl Editor {
                     self.buffer_manager.active().buffer.row(row).size() + 1
                 };
                 let byte_upto = utf8::byte_offset_for_char_index(&render, upto).min(render.len());
-                if let Some(pos) = utf8::rfind_word_bounded(&render, &term, byte_upto) {
+                if let Some(pos) = utf8::rfind_pattern_before(&render, &term, byte_upto) {
                     let match_col = utf8::char_index_for_byte_offset(&render, pos);
                     if !(is_final_wrap && match_col < start_col) {
                         let ob = self.buffer_manager.active_mut();
@@ -907,13 +907,25 @@ impl Editor {
     }
 
     fn goto_line(&mut self) {
-        let result = self.prompt("Aller a la ligne: %s (Echap pour annuler)");
+        let result = self.prompt("Aller a ligne,colonne: %s (Echap pour annuler)");
         let result = match result {
             Some(r) => r,
             None => return,
         };
 
-        let line_num: i64 = match result.trim().parse() {
+        let trimmed = result.trim();
+        let parts: Vec<&str> = trimmed.splitn(2, ',').collect();
+
+        let line_str = parts[0].trim();
+        if line_str.is_empty() {
+            self.set_status_message_kind(
+                "Numero de ligne requis (ligne ou ligne,colonne)",
+                MessageKind::Error,
+            );
+            return;
+        }
+
+        let line_num: i64 = match line_str.parse() {
             Ok(n) if n > 0 => n,
             _ => {
                 self.set_status_message_kind("Numero de ligne invalide", MessageKind::Error);
@@ -921,14 +933,40 @@ impl Editor {
             }
         };
 
+        let col_num: Option<i64> = if parts.len() == 2 {
+            let col_str = parts[1].trim();
+            if col_str.is_empty() {
+                None
+            } else {
+                match col_str.parse::<i64>() {
+                    Ok(n) if n > 0 => Some(n),
+                    _ => {
+                        self.set_status_message_kind(
+                            "Numero de colonne invalide",
+                            MessageKind::Error,
+                        );
+                        return;
+                    }
+                }
+            }
+        } else {
+            None
+        };
+
         let ob = self.buffer_manager.active_mut();
-        let mut target = (line_num - 1) as usize;
-        if target >= ob.buffer.num_rows() {
-            target = ob.buffer.num_rows().saturating_sub(1);
+        let mut target_row = (line_num - 1) as usize;
+        if target_row >= ob.buffer.num_rows() {
+            target_row = ob.buffer.num_rows().saturating_sub(1);
         }
 
-        ob.cursor.cy = target;
-        ob.cursor.cx = 0;
+        let row_size = ob.buffer.row(target_row).size();
+        let target_col = match col_num {
+            Some(c) => ((c - 1) as usize).min(row_size),
+            None => 0,
+        };
+
+        ob.cursor.cy = target_row;
+        ob.cursor.cx = target_col;
         ob.selection.is_active = false;
     }
 
@@ -955,7 +993,7 @@ impl Editor {
                     .row(r)
                     .render()
                     .to_string();
-                let pos = match utf8::find_word_bounded(&render, &search_term, search_from_byte) {
+                let pos = match utf8::find_pattern(&render, &search_term, search_from_byte) {
                     Some(p) => p,
                     None => break,
                 };

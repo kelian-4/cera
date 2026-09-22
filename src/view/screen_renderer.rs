@@ -253,64 +253,82 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let entries = crate::view::help_text::short_help_entries();
     let min_column_width = 13usize;
     let columns_per_line = (state.screencols / min_column_width).max(1);
-    let column_width = state.screencols / columns_per_line;
-    let text_width = column_width.saturating_sub(1).max(1);
-
-    let mut lines: Vec<String> = vec![String::new(), String::new()];
-    let mut line_columns: Vec<usize> = vec![0, 0];
+    let text_width = min_column_width.saturating_sub(1).max(1);
     let max_entries = columns_per_line * 2;
+
+    let mut line_cells: Vec<Vec<String>> = vec![Vec::new(), Vec::new()];
 
     for (i, entry) in entries.iter().take(max_entries).enumerate() {
         let line_idx = i % 2;
         let cell = format!("{} {}", entry.key, entry.label);
-
-        let remaining = state
-            .screencols
-            .saturating_sub(lines[line_idx].chars().count());
-        if remaining == 0 {
-            continue;
-        }
-
         let cell_len = cell.chars().count();
         let text_part: String = if cell_len > text_width {
             cell.chars().take(text_width).collect()
         } else {
-            cell.clone()
+            cell
         };
-
-        let mut cell_final = text_part;
-        let total_width = column_width.min(remaining);
-        while cell_final.chars().count() < total_width {
-            cell_final.push(' ');
-        }
-        if cell_final.chars().count() > remaining {
-            cell_final = cell_final.chars().take(remaining).collect();
-        }
-
-        lines[line_idx].push_str(&cell_final);
-        line_columns[line_idx] += 1;
+        line_cells[line_idx].push(text_part);
     }
 
-    let used_columns = line_columns.iter().copied().max().unwrap_or(0);
-    let used_width = used_columns * column_width;
-    let left_padding = state.screencols.saturating_sub(used_width) / 2;
+    for cells in line_cells.iter().take(2) {
+        draw_justified_line(ab, state.screencols, cells);
+    }
+}
 
-    for line in lines.iter().take(2) {
-        let content_len = line.chars().count();
-        let trimmed: String = line.chars().take(content_len).collect();
-
-        for _ in 0..left_padding {
-            ab.append(" ");
-        }
-        let available = state.screencols.saturating_sub(left_padding);
-        let line_len = trimmed.chars().count().min(available);
-        let line_trunc: String = trimmed.chars().take(line_len).collect();
-        ab.append(&line_trunc);
-        for _ in (left_padding + line_len)..state.screencols {
+fn draw_justified_line(ab: &mut AppendBuffer, width: usize, cells: &[String]) {
+    if cells.is_empty() {
+        for _ in 0..width {
             ab.append(" ");
         }
         ab.append("\r\n");
+        return;
     }
+
+    let total_text_len: usize = cells.iter().map(|c| c.chars().count()).sum();
+
+    if cells.len() == 1 {
+        let cell = &cells[0];
+        let cell_len = cell.chars().count();
+        ab.append(cell);
+        for _ in cell_len..width {
+            ab.append(" ");
+        }
+        ab.append("\r\n");
+        return;
+    }
+
+    let gaps = cells.len() - 1;
+    let available_space = width.saturating_sub(total_text_len);
+    let base_gap = available_space / gaps;
+    let extra = available_space % gaps;
+
+    let mut written = 0usize;
+    for (i, cell) in cells.iter().enumerate() {
+        if written >= width {
+            break;
+        }
+        let cell_len = cell.chars().count().min(width - written);
+        let cell_trunc: String = cell.chars().take(cell_len).collect();
+        ab.append(&cell_trunc);
+        written += cell_len;
+
+        if i < gaps {
+            let mut gap = base_gap;
+            if i < extra {
+                gap += 1;
+            }
+            gap = gap.min(width.saturating_sub(written));
+            for _ in 0..gap {
+                ab.append(" ");
+            }
+            written += gap;
+        }
+    }
+
+    for _ in written..width {
+        ab.append(" ");
+    }
+    ab.append("\r\n");
 }
 
 fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
