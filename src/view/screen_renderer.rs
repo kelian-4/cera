@@ -324,26 +324,60 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let text_width = min_column_width.saturating_sub(1).max(1);
     let max_entries = columns_per_line * 2;
 
-    let mut line_cells: Vec<Vec<String>> = vec![Vec::new(), Vec::new()];
-
-    for (i, entry) in entries.iter().take(max_entries).enumerate() {
-        let line_idx = i % 2;
-        let cell = format!("{} {}", entry.key, entry.label);
-        let cell_len = cell.chars().count();
-        let text_part: String = if cell_len > text_width {
-            cell.chars().take(text_width).collect()
-        } else {
-            cell
-        };
-        line_cells[line_idx].push(text_part);
+    // Chaque colonne empile 2 entrees (ligne du haut, ligne du bas). On
+    // calcule une largeur de colonne commune aux deux lignes (le plus long
+    // des deux textes) pour garantir un alignement vertical exact, plutot
+    // que de justifier chaque ligne independamment.
+    let mut columns: Vec<(String, Option<String>)> = Vec::new();
+    for pair in entries
+        .iter()
+        .take(max_entries)
+        .collect::<Vec<_>>()
+        .chunks(2)
+    {
+        let top = format_help_cell(pair[0], text_width);
+        let bottom = pair.get(1).map(|e| format_help_cell(e, text_width));
+        columns.push((top, bottom));
     }
 
-    for cells in line_cells.iter().take(2) {
-        draw_justified_line(ab, state.screencols, cells);
+    let top_cells: Vec<String> = columns.iter().map(|(t, _)| t.clone()).collect();
+    let bottom_cells: Vec<String> = columns
+        .iter()
+        .map(|(_, b)| b.clone().unwrap_or_default())
+        .collect();
+    let column_widths: Vec<usize> = columns
+        .iter()
+        .map(|(t, b)| {
+            let bl = b.as_ref().map(|s| s.chars().count()).unwrap_or(0);
+            t.chars().count().max(bl)
+        })
+        .collect();
+
+    draw_help_grid_line(ab, state.screencols, &top_cells, &column_widths);
+    draw_help_grid_line(ab, state.screencols, &bottom_cells, &column_widths);
+}
+
+fn format_help_cell(entry: &crate::view::help_text::ShortHelpEntry, text_width: usize) -> String {
+    let cell = format!("{} {}", entry.key, entry.label);
+    let cell_len = cell.chars().count();
+    if cell_len > text_width {
+        cell.chars().take(text_width).collect()
+    } else {
+        cell
     }
 }
 
-fn draw_justified_line(ab: &mut AppendBuffer, width: usize, cells: &[String]) {
+/// Dessine une ligne du bandeau d'aide avec des colonnes de largeur fixe
+/// (`column_widths`), identiques sur les deux lignes du bandeau, pour que
+/// chaque colonne s'aligne verticalement lettre pour lettre. L'espace
+/// restant est reparti en marges egales entre les colonnes (bords colles
+/// aux marges, comme le format justifie existant).
+fn draw_help_grid_line(
+    ab: &mut AppendBuffer,
+    width: usize,
+    cells: &[String],
+    column_widths: &[usize],
+) {
     if cells.is_empty() {
         for _ in 0..width {
             ab.append(" ");
@@ -352,7 +386,7 @@ fn draw_justified_line(ab: &mut AppendBuffer, width: usize, cells: &[String]) {
         return;
     }
 
-    let total_text_len: usize = cells.iter().map(|c| c.chars().count()).sum();
+    let total_text_len: usize = column_widths.iter().sum();
 
     if cells.len() == 1 {
         let cell = &cells[0];
@@ -375,10 +409,21 @@ fn draw_justified_line(ab: &mut AppendBuffer, width: usize, cells: &[String]) {
         if written >= width {
             break;
         }
+        let col_width = column_widths[i];
         let cell_len = cell.chars().count().min(width - written);
         let cell_trunc: String = cell.chars().take(cell_len).collect();
         ab.append(&cell_trunc);
         written += cell_len;
+
+        // Complete jusqu'a la largeur de la colonne pour que la colonne
+        // suivante demarre au meme endroit sur les deux lignes.
+        let pad_to_col = col_width
+            .saturating_sub(cell_len)
+            .min(width.saturating_sub(written));
+        for _ in 0..pad_to_col {
+            ab.append(" ");
+        }
+        written += pad_to_col;
 
         if i < gaps {
             let mut gap = base_gap;

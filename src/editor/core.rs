@@ -1380,10 +1380,9 @@ impl Editor {
 
             k if k == ctrl('q') => {
                 if self.buffer_manager.any_dirty() && self.quit_times > 0 {
-                    let msg = format!(
-                        "ATTENTION ! Des modifications ne sont pas sauvegardees. Appuyez sur Ctrl-Q {} fois de plus pour quitter.",
-                        self.quit_times
-                    );
+                    let msg = "ATTENTION ! Des modifications ne sont pas sauvegardees. \
+                        Appuyez encore sur Ctrl-Q pour quitter, Echap pour annuler."
+                        .to_string();
                     self.set_status_message_kind(msg, MessageKind::Error);
                     self.quit_times -= 1;
                     return;
