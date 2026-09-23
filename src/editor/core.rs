@@ -723,6 +723,7 @@ impl Editor {
     }
 
     fn update_find_highlight(&mut self) {
+        self.clear_find_highlight();
         self.search_total_matches = 0;
         if self.search_term.is_empty() {
             return;
@@ -733,6 +734,7 @@ impl Editor {
         let cursor_col = ob.cursor.cx;
         let num_rows = ob.buffer.num_rows();
         let term = self.search_term.clone();
+        let term_char_len = utf8::codepoint_count(&term);
 
         let mut match_containing_cursor = 0usize;
 
@@ -748,9 +750,10 @@ impl Editor {
             while let Some(abs_pos) = utf8::find_pattern(&render, &term, search_from) {
                 self.search_total_matches += 1;
 
+                let match_char_idx = utf8::char_index_for_byte_offset(&render, abs_pos);
+
                 match r.cmp(&cursor_row) {
                     std::cmp::Ordering::Equal => {
-                        let match_char_idx = utf8::char_index_for_byte_offset(&render, abs_pos);
                         if match_char_idx <= cursor_col {
                             match_containing_cursor = self.search_total_matches;
                         }
@@ -759,6 +762,13 @@ impl Editor {
                         match_containing_cursor = self.search_total_matches;
                     }
                     std::cmp::Ordering::Greater => {}
+                }
+
+                let row_mut = self.buffer_manager.active_mut().buffer.row_mut(r);
+                let hl = row_mut.hl_mut();
+                let end_idx = (match_char_idx + term_char_len).min(hl.len());
+                for slot in hl.iter_mut().take(end_idx).skip(match_char_idx) {
+                    *slot = crate::model::row::Highlight::Match;
                 }
 
                 search_from = abs_pos + 1;
