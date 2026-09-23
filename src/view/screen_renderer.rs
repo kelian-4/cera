@@ -68,6 +68,42 @@ fn digit_count(n: usize) -> usize {
     }
 }
 
+/// Decoupe `text` en au plus 2 lignes d'au plus `width` caracteres chacune,
+/// en coupant sur une limite de mot (espace) quand c'est possible. Si un
+/// seul mot depasse `width`, il est coupe durement. Le texte au-dela de ce
+/// que 2 lignes de `width` peuvent contenir est tronque.
+pub fn wrap_message_two_lines(text: &str, width: usize) -> (String, Option<String>) {
+    if width == 0 {
+        return (String::new(), None);
+    }
+    let char_count = text.chars().count();
+    if char_count <= width {
+        return (text.to_string(), None);
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+
+    // Cherche la derniere limite de mot (espace) a l'interieur de `width`.
+    let mut split_at = width;
+    if let Some(last_space) = chars[..width].iter().rposition(|&c| c == ' ') {
+        if last_space > 0 {
+            split_at = last_space;
+        }
+    }
+
+    let first_line: String = chars[..split_at].iter().collect();
+    let mut rest_start = split_at;
+    while rest_start < chars.len() && chars[rest_start] == ' ' {
+        rest_start += 1;
+    }
+
+    let remaining = &chars[rest_start..];
+    let second_len = remaining.len().min(width);
+    let second_line: String = remaining[..second_len].iter().collect();
+
+    (first_line, Some(second_line))
+}
+
 pub fn gutter_width(state: &ViewState) -> usize {
     if !state.config.show_line_numbers {
         return 0;
@@ -77,7 +113,7 @@ pub fn gutter_width(state: &ViewState) -> usize {
 }
 
 pub fn text_area_screen_rows(state: &ViewState) -> usize {
-    let mut reserved = 2usize;
+    let mut reserved = status_bar_rows(state) + message_bar_rows(state);
     if state.buffer_manager.count() > 1 {
         reserved += 1;
     }
@@ -85,6 +121,38 @@ pub fn text_area_screen_rows(state: &ViewState) -> usize {
         reserved += 2;
     }
     state.screenrows.saturating_sub(reserved).max(1)
+}
+
+/// Nombre de lignes que prendra la barre de statut (prompt ou barre normale).
+/// La barre de statut normale tient toujours sur 1 ligne (contenu structure,
+/// jamais coupe). Seul un `prompt_text` long peut necessiter 2 lignes.
+fn status_bar_rows(state: &ViewState) -> usize {
+    match &state.prompt_text {
+        Some(prompt_text) => {
+            let line = format!(" {}", prompt_text);
+            let (_, second) = wrap_message_two_lines(&line, state.screencols);
+            if second.is_some() {
+                2
+            } else {
+                1
+            }
+        }
+        None => 1,
+    }
+}
+
+/// Nombre de lignes que prendra la barre de message (succes/erreur), 0 si
+/// aucun message n'est actuellement affiche.
+fn message_bar_rows(state: &ViewState) -> usize {
+    if state.status_message.is_empty() || state.status_message_age_seconds >= 5 {
+        return 1;
+    }
+    let (_, second) = wrap_message_two_lines(&state.status_message, state.screencols);
+    if second.is_some() {
+        2
+    } else {
+        1
+    }
 }
 
 fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
@@ -334,13 +402,23 @@ fn draw_justified_line(ab: &mut AppendBuffer, width: usize, cells: &[String]) {
 fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     if let Some(prompt_text) = &state.prompt_text {
         let line = format!(" {}", prompt_text);
-        let line_len = line.chars().count().min(state.screencols);
-        let line_trunc: String = line.chars().take(line_len).collect();
-        ab.append(&line_trunc);
-        for _ in line_len..state.screencols {
+        let (first, second) = wrap_message_two_lines(&line, state.screencols);
+
+        let first_len = first.chars().count();
+        ab.append(&first);
+        for _ in first_len..state.screencols {
             ab.append(" ");
         }
         ab.append("\r\n");
+
+        if let Some(second) = second {
+            let second_len = second.chars().count();
+            ab.append(&second);
+            for _ in second_len..state.screencols {
+                ab.append(" ");
+            }
+            ab.append("\r\n");
+        }
         return;
     }
 
@@ -418,17 +496,25 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
 
 fn draw_message_bar(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\x1b[K");
-    let msg_len = state.status_message.chars().count().min(state.screencols);
-    if msg_len > 0 && state.status_message_age_seconds < 5 {
+    if !state.status_message.is_empty() && state.status_message_age_seconds < 5 {
         let color = match state.status_message_kind {
             MessageKind::Success => state.config.theme.success_fg,
             MessageKind::Error => state.config.theme.error_fg,
             MessageKind::Info => state.config.theme.normal,
         };
+        let (first, second) = wrap_message_two_lines(&state.status_message, state.screencols);
+
         ab.append(&fg_sequence(color, state.config.true_color));
-        let msg_trunc: String = state.status_message.chars().take(msg_len).collect();
-        ab.append(&msg_trunc);
+        ab.append(&first);
         ab.append(reset_fg_sequence());
+
+        if let Some(second) = second {
+            ab.append("\r\n");
+            ab.append("\x1b[K");
+            ab.append(&fg_sequence(color, state.config.true_color));
+            ab.append(&second);
+            ab.append(reset_fg_sequence());
+        }
     }
 }
 
@@ -519,4 +605,46 @@ pub fn refresh(state: &ViewState) -> String {
     ab.append("\x1b[?25h");
 
     ab.data().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrap_message_fits_on_one_line() {
+        let (first, second) = wrap_message_two_lines("short message", 40);
+        assert_eq!(first, "short message");
+        assert_eq!(second, None);
+    }
+
+    #[test]
+    fn test_wrap_message_breaks_on_word_boundary() {
+        let text = "Remplacer \"X\" ? (o)ui / (n)on / (t)out / Echap pour arreter";
+        let (first, second) = wrap_message_two_lines(text, 30);
+        assert!(first.chars().count() <= 30);
+        assert!(!first.ends_with(' '));
+        let second = second.expect("le message devrait se couper sur 2 lignes");
+        assert!(second.chars().count() <= 30);
+        // Aucune coupure au milieu d'un mot : la premiere ligne se termine
+        // par un mot complet, la deuxieme reprend au mot suivant.
+        assert_eq!(first, "Remplacer \"X\" ? (o)ui / (n)on");
+        assert_eq!(second, "/ (t)out / Echap pour arreter");
+    }
+
+    #[test]
+    fn test_wrap_message_hard_breaks_long_word() {
+        let text = "supercalifragilisticexpialidocious";
+        let (first, second) = wrap_message_two_lines(text, 10);
+        assert_eq!(first.chars().count(), 10);
+        let second = second.expect("un mot plus long que la largeur doit etre coupe");
+        assert_eq!(second.chars().count(), 10);
+    }
+
+    #[test]
+    fn test_wrap_message_zero_width() {
+        let (first, second) = wrap_message_two_lines("abc", 0);
+        assert_eq!(first, "");
+        assert_eq!(second, None);
+    }
 }
