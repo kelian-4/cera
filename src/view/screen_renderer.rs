@@ -23,6 +23,7 @@ pub struct ViewState<'a> {
     pub overlay_full_doc: bool,
     pub help_active: bool,
     pub prompt_text: Option<String>,
+    pub prompt_cursor_offset: Option<usize>,
     pub search: SearchDisplayInfo,
     pub search_term: String,
     pub config: &'a Config,
@@ -444,7 +445,10 @@ fn draw_help_grid_line(
     ab.append("\r\n");
 }
 
-fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
+/// Dessine la barre de statut. Retourne, si un curseur de saisie doit etre
+/// affiche, sa position relative (ligne 0 ou 1 dans la zone dessinee ici,
+/// colonne 0-indexee) pour que `refresh` puisse y placer le curseur reel.
+fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) -> Option<(usize, usize)> {
     if let Some(prompt_text) = &state.prompt_text {
         let line = format!(" {}", prompt_text);
         let (first, second) = wrap_message_two_lines(&line, state.screencols);
@@ -456,6 +460,21 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
         }
         ab.append("\r\n");
 
+        let mut cursor_pos = None;
+        // Le curseur logique se trouve a `1 + offset` dans `line` (le " "
+        // ajoute en prefixe compte pour 1). On localise sur quelle ligne
+        // affichee (avant/apres le wrap) il tombe.
+        if let Some(offset) = state.prompt_cursor_offset {
+            let target = (1 + offset).min(line.chars().count());
+            if target <= first_len {
+                cursor_pos = Some((0, target));
+            } else if second.is_some() {
+                cursor_pos = Some((1, target - first_len));
+            } else {
+                cursor_pos = Some((0, first_len));
+            }
+        }
+
         if let Some(second) = second {
             let second_len = second.chars().count();
             ab.append(&second);
@@ -464,7 +483,7 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
             }
             ab.append("\r\n");
         }
-        return;
+        return cursor_pos;
     }
 
     let ob = state.buffer_manager.active();
@@ -503,6 +522,14 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let left_trunc: String = left.chars().take(left_len).collect();
     ab.append(&left_trunc);
 
+    let search_cursor_pos = if state.search.active {
+        let prefix_len = " recherche: ".chars().count();
+        let target = (prefix_len + state.search_term.chars().count()).min(left_len);
+        Some((0, target))
+    } else {
+        None
+    };
+
     let right_len = right.chars().count();
     let center_len = center.chars().count();
 
@@ -537,6 +564,8 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     }
 
     ab.append("\r\n");
+
+    search_cursor_pos
 }
 
 fn draw_message_bar(ab: &mut AppendBuffer, state: &ViewState) {
@@ -631,7 +660,7 @@ pub fn refresh(state: &ViewState) -> String {
 
     draw_tab_bar(&mut ab, state);
     draw_rows(&mut ab, state);
-    draw_status_bar(&mut ab, state);
+    let status_cursor = draw_status_bar(&mut ab, state);
     draw_help_bar(&mut ab, state);
     draw_message_bar(&mut ab, state);
 
@@ -642,6 +671,15 @@ pub fn refresh(state: &ViewState) -> String {
     } else {
         0
     };
+
+    if let Some((rel_row, col)) = status_cursor {
+        let status_bar_row = tab_bar_height + text_area_screen_rows(state);
+        let cursor_row = status_bar_row + rel_row + 1;
+        let cursor_col = col + 1;
+        ab.append(&format!("\x1b[{};{}H", cursor_row, cursor_col));
+        ab.append("\x1b[?25h");
+        return ab.data().to_string();
+    }
 
     let cursor_row = tab_bar_height + (ob.cursor.cy.saturating_sub(state.rowoff)) + 1;
     let cursor_col = gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;

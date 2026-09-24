@@ -36,6 +36,7 @@ pub struct Editor {
     overlay_full_doc: bool,
     help_active: bool,
     prompt_text: Option<String>,
+    prompt_cursor_offset: Option<usize>,
 
     search_active: bool,
     search_term: String,
@@ -75,6 +76,7 @@ impl Editor {
             overlay_full_doc: false,
             help_active: false,
             prompt_text: None,
+            prompt_cursor_offset: None,
             search_active: false,
             search_term: String::new(),
             search_current_match: 0,
@@ -119,6 +121,7 @@ impl Editor {
             overlay_full_doc: self.overlay_full_doc,
             help_active: self.help_active,
             prompt_text: self.prompt_text.clone(),
+            prompt_cursor_offset: self.prompt_cursor_offset,
             search,
             search_term: self.search_term.clone(),
             config: &self.config,
@@ -671,10 +674,14 @@ impl Editor {
 
     fn prompt(&mut self, prompt_fmt: &str) -> Option<String> {
         let mut buf = String::new();
+        let prefix_chars = prompt_fmt
+            .find("%s")
+            .map(|byte_idx| prompt_fmt[..byte_idx].chars().count());
 
         loop {
             let msg = prompt_fmt.replace("%s", &buf);
             self.prompt_text = Some(msg);
+            self.prompt_cursor_offset = prefix_chars.map(|prefix| prefix + buf.chars().count());
             self.refresh_screen();
 
             let c = match self.terminal.read_key() {
@@ -691,10 +698,12 @@ impl Editor {
                 buf.pop();
             } else if c == 0x1b {
                 self.prompt_text = None;
+                self.prompt_cursor_offset = None;
                 return None;
             } else if c == '\r' as i32 {
                 if !buf.is_empty() {
                     self.prompt_text = None;
+                    self.prompt_cursor_offset = None;
                     return Some(buf);
                 }
             } else if terminal::is_encoded_codepoint(c) {
@@ -980,11 +989,63 @@ impl Editor {
         ob.selection.is_active = false;
     }
 
+    fn confirm_quit_with_unsaved_changes(&mut self) {
+        self.prompt_text =
+            Some("Modifications non sauvegardees. Ctrl-Q: quitter, Echap: annuler".to_string());
+        self.prompt_cursor_offset = None;
+
+        loop {
+            self.refresh_screen();
+
+            let mut key = terminal::NO_KEY;
+            while key == terminal::NO_KEY {
+                key = self.terminal.read_key().unwrap_or(terminal::NO_KEY);
+                if key == terminal::NO_KEY {
+                    self.apply_resize_if_needed();
+                }
+            }
+
+            if key == ctrl('q') {
+                self.terminal.write(b"\x1b[?1049l");
+                std::process::exit(0);
+            }
+            if key == 0x1b {
+                self.prompt_text = None;
+                self.quit_times = self.config.quit_times;
+                return;
+            }
+            // Toute autre touche est ignoree : c'est une vraie confirmation
+            // modale, le bandeau reste affiche tant que Ctrl-Q ou Echap
+            // n'a pas ete presse.
+        }
+    }
+
+    fn pattern_exists_in_buffer(&self, term: &str) -> bool {
+        let ob = self.buffer_manager.active();
+        let num_rows = ob.buffer.num_rows();
+        for r in 0..num_rows {
+            let render = ob.buffer.row(r).render();
+            if utf8::find_pattern(render, term, 0).is_some() {
+                return true;
+            }
+        }
+        false
+    }
+
     fn replace(&mut self) {
         let search_term = match self.prompt("Entre le mot a remplacer: %s (Echap pour annuler)") {
             Some(s) if !s.is_empty() => s,
             _ => return,
         };
+
+        if !self.pattern_exists_in_buffer(&search_term) {
+            self.set_status_message_kind(
+                format!("\"{}\" introuvable", search_term),
+                MessageKind::Error,
+            );
+            return;
+        }
+
         let replace_with = self
             .prompt("Remplacer par: %s (Echap pour annuler)")
             .unwrap_or_default();
@@ -1027,6 +1088,7 @@ impl Editor {
                         search_term
                     );
                     self.prompt_text = Some(confirm_msg);
+                    self.prompt_cursor_offset = None;
                     self.refresh_screen();
 
                     let mut key = terminal::NO_KEY;
@@ -1380,11 +1442,7 @@ impl Editor {
 
             k if k == ctrl('q') => {
                 if self.buffer_manager.any_dirty() && self.quit_times > 0 {
-                    let msg = "ATTENTION ! Des modifications ne sont pas sauvegardees. \
-                        Appuyez encore sur Ctrl-Q pour quitter, Echap pour annuler."
-                        .to_string();
-                    self.set_status_message_kind(msg, MessageKind::Error);
-                    self.quit_times -= 1;
+                    self.confirm_quit_with_unsaved_changes();
                     return;
                 }
                 self.terminal.write(b"\x1b[?1049l");

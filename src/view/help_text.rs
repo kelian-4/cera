@@ -64,19 +64,19 @@ pub fn short_help_entries() -> &'static [ShortHelpEntry] {
         },
         ShortHelpEntry {
             key: "^L",
-            label: "aller a la ligne",
+            label: "aller ligne",
         },
         ShortHelpEntry {
             key: "^N",
-            label: "tampon suivant",
+            label: "fichier suivant",
         },
         ShortHelpEntry {
             key: "^P",
-            label: "tampon precedent",
+            label: "fichier precedent",
         },
         ShortHelpEntry {
             key: "^D",
-            label: "documentation",
+            label: "docs",
         },
     ]
 }
