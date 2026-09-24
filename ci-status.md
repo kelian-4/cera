@@ -1,9 +1,9 @@
 # CI Status
 
-Commit: c4785d6999b6b922d9f9509365046901e0df9d8f
+Commit: e8d3b88793e02e5ac44f230b49ff4ef1fa997576
 Branche: dev
-Date: 2026-09-23 11:41:49 UTC
-Run: https://github.com/kelian-4/cera/actions/runs/35856001767
+Date: 2026-09-24 06:18:30 UTC
+Run: https://github.com/kelian-4/cera/actions/runs/35963835953
 
 | Etape | Resultat |
 |---|---|
@@ -19,20 +19,20 @@ Run: https://github.com/kelian-4/cera/actions/runs/35856001767
 ## Log complet - Clippy
 ```
 [1m[92m    Checking[0m cera v0.1.0 (/home/runner/work/cera/cera)
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.61s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.56s
 ```
 
 ## Log complet - Build
 ```
 [1m[92m       Fresh[0m libc v0.2.189
-[1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m cfg-if v1.0.4
+[1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m nix v0.27.1
-[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/model/mod.rs` has changed (1790163694.964662008s, 199h 7m 29s after last build at 1789446845.432723122s)
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/model/row.rs` has changed (1790230696.371333143s, 217h 44m 11s after last build at 1789446845.432723122s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7684b1cb7fc3ad41 -C extra-filename=-265f65eb0fbef32c --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rmeta --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rmeta --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rmeta`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=0373c7d690e4aeca -C extra-filename=-4ea6f987a5324741 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.06s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.94s
 ```
 
 ## Log complet - Tests
@@ -41,11 +41,11 @@ Run: https://github.com/kelian-4/cera/actions/runs/35856001767
 [1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m cfg-if v1.0.4
 [1m[92m       Fresh[0m nix v0.27.1
-[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/editor/clipboard.rs` has changed (1790163694.963683677s, 199h 7m 28s after last build at 1789446846.270981734s)
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/view/colors.rs` has changed (1790230696.371684786s, 217h 44m 10s after last build at 1789446846.270981734s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8b06f7f737320b48 -C extra-filename=-24fe9b87231282b6 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=acaf246eb6f4080d -C extra-filename=-61406aa377921b4c --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
-[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.84s
+[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8b06f7f737320b48 -C extra-filename=-24fe9b87231282b6 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-265f65eb0fbef32c.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-61091f233f82b102.rlib`
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.73s
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-61406aa377921b4c`
 
 running 40 tests
@@ -60,7 +60,6 @@ test io::file_io::tests::test_save_writes_to_disk ... ok
 test io::json::tests::test_json_invalid ... ok
 test io::json::tests::test_json_nested_object ... ok
 test io::json::tests::test_json_parsing ... ok
-test editor::clipboard::tests::test_clipboard_fallback_roundtrip ... ok
 test model::buffer::tests::test_delete_char_merges_rows ... ok
 test model::buffer::tests::test_dirty_flag ... ok
 test model::buffer::tests::test_insert_newline_splits_row ... ok
@@ -70,25 +69,26 @@ test model::buffer::tests::test_to_string_content ... ok
 test model::row::tests::test_cx_rx_roundtrip ... ok
 test model::row::tests::test_insert_delete ... ok
 test model::row::tests::test_tab_expansion ... ok
-test model::row::tests::test_utf8_insert_delete ... ok
+test editor::clipboard::tests::test_clipboard_fallback_roundtrip ... ok
 test model::selection::tests::test_selection_range ... ok
+test model::row::tests::test_utf8_insert_delete ... ok
 test model::utf8::tests::test_byte_offset_for_char_index ... ok
 test model::utf8::tests::test_char_index_for_byte_offset ... ok
 test model::utf8::tests::test_codepoint_count ... ok
 test model::utf8::tests::test_display_width_cjk ... ok
-test model::utf8::tests::test_find_pattern_matches_as_substring ... ok
 test model::utf8::tests::test_find_pattern_advances_from_offset ... ok
 test model::utf8::tests::test_find_pattern_matches_inside_larger_word ... ok
+test model::utf8::tests::test_find_pattern_matches_as_substring ... ok
 test model::utf8::tests::test_rfind_pattern_before ... ok
 test model::utf8::tests::test_substr_by_char ... ok
 test syntax::tests::test_syntax_selection ... ok
-test syntax::tests::test_update_syntax_keyword ... ok
 test view::colors::tests::test_ansi256_white ... ok
+test syntax::tests::test_update_syntax_keyword ... ok
 test view::colors::tests::test_true_color_sequence ... ok
 test view::screen_renderer::tests::test_wrap_message_breaks_on_word_boundary ... ok
-test view::screen_renderer::tests::test_wrap_message_fits_on_one_line ... ok
-test view::screen_renderer::tests::test_wrap_message_zero_width ... ok
 test view::screen_renderer::tests::test_wrap_message_hard_breaks_long_word ... ok
+test view::screen_renderer::tests::test_wrap_message_zero_width ... ok
+test view::screen_renderer::tests::test_wrap_message_fits_on_one_line ... ok
 
 test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
