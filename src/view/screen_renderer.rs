@@ -320,52 +320,61 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     }
 
     let entries = crate::view::help_text::short_help_entries();
-    let min_column_width = 13usize;
-    let columns_per_line = (state.screencols / min_column_width).max(1);
-    let text_width = min_column_width.saturating_sub(1).max(1);
-    let max_entries = columns_per_line * 2;
+    let min_gap = 2usize;
 
-    // Chaque colonne empile 2 entrees (ligne du haut, ligne du bas). On
-    // calcule une largeur de colonne commune aux deux lignes (le plus long
-    // des deux textes) pour garantir un alignement vertical exact, plutot
-    // que de justifier chaque ligne independamment.
-    let mut columns: Vec<(String, Option<String>)> = Vec::new();
-    for pair in entries
-        .iter()
-        .take(max_entries)
-        .collect::<Vec<_>>()
-        .chunks(2)
-    {
-        let top = format_help_cell(pair[0], text_width);
-        let bottom = pair.get(1).map(|e| format_help_cell(e, text_width));
-        columns.push((top, bottom));
-    }
+    // Largeur naturelle de chaque paire empilee (haut, bas), sans jamais
+    // tronquer le texte : c'est le plus long des deux libelles de la
+    // colonne.
+    let pairs: Vec<(
+        &crate::view::help_text::ShortHelpEntry,
+        Option<&crate::view::help_text::ShortHelpEntry>,
+    )> = entries.chunks(2).map(|c| (&c[0], c.get(1))).collect();
 
-    let top_cells: Vec<String> = columns.iter().map(|(t, _)| t.clone()).collect();
-    let bottom_cells: Vec<String> = columns
+    let natural_widths: Vec<usize> = pairs
         .iter()
-        .map(|(_, b)| b.clone().unwrap_or_default())
-        .collect();
-    let column_widths: Vec<usize> = columns
-        .iter()
-        .map(|(t, b)| {
-            let bl = b.as_ref().map(|s| s.chars().count()).unwrap_or(0);
-            t.chars().count().max(bl)
+        .map(|(top, bottom)| {
+            let top_len = format!("{} {}", top.key, top.label).chars().count();
+            let bottom_len = bottom
+                .map(|e| format!("{} {}", e.key, e.label).chars().count())
+                .unwrap_or(0);
+            top_len.max(bottom_len)
         })
         .collect();
 
+    // On ajoute des colonnes tant qu'elles rentrent entierement (largeur
+    // naturelle + marge minimale entre colonnes), sans jamais tronquer un
+    // libelle : si une colonne ne rentre plus, on s'arrete la plutot que
+    // de couper son texte.
+    let mut num_columns = 0usize;
+    let mut used = 0usize;
+    for (i, &w) in natural_widths.iter().enumerate() {
+        let extra = if i == 0 { w } else { min_gap + w };
+        if used + extra > state.screencols {
+            break;
+        }
+        used += extra;
+        num_columns = i + 1;
+    }
+    let num_columns = num_columns.max(1);
+
+    let top_cells: Vec<String> = pairs
+        .iter()
+        .take(num_columns)
+        .map(|(top, _)| format!("{} {}", top.key, top.label))
+        .collect();
+    let bottom_cells: Vec<String> = pairs
+        .iter()
+        .take(num_columns)
+        .map(|(_, bottom)| {
+            bottom
+                .map(|e| format!("{} {}", e.key, e.label))
+                .unwrap_or_default()
+        })
+        .collect();
+    let column_widths: Vec<usize> = natural_widths.into_iter().take(num_columns).collect();
+
     draw_help_grid_line(ab, state.screencols, &top_cells, &column_widths);
     draw_help_grid_line(ab, state.screencols, &bottom_cells, &column_widths);
-}
-
-fn format_help_cell(entry: &crate::view::help_text::ShortHelpEntry, text_width: usize) -> String {
-    let cell = format!("{} {}", entry.key, entry.label);
-    let cell_len = cell.chars().count();
-    if cell_len > text_width {
-        cell.chars().take(text_width).collect()
-    } else {
-        cell
-    }
 }
 
 /// Dessine une ligne du bandeau d'aide avec des colonnes de largeur fixe
@@ -445,45 +454,98 @@ fn draw_help_grid_line(
     ab.append("\r\n");
 }
 
-/// Dessine la barre de statut. Retourne, si un curseur de saisie doit etre
-/// affiche, sa position relative (ligne 0 ou 1 dans la zone dessinee ici,
-/// colonne 0-indexee) pour que `refresh` puisse y placer le curseur reel.
-fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) -> Option<(usize, usize)> {
+/// Ecrit `text` caractere par caractere, en affichant le caractere a
+/// `cursor_offset` (index 0-indexe dans `text`) en video inversee pour
+/// simuler un curseur de saisie "custom", distinct du curseur reel du
+/// terminal qui reste sur le document pendant la saisie. Si `cursor_offset`
+/// pointe juste apres le dernier caractere (fin de saisie), un espace
+/// inverse est ajoute pour representer le curseur, sauf si `text` occupe
+/// deja toute la largeur disponible (`max_width`), auquel cas le dernier
+/// caractere existant est inverse a la place pour ne jamais depasser la
+/// largeur du terminal.
+fn append_with_custom_cursor(
+    ab: &mut AppendBuffer,
+    text: &str,
+    cursor_offset: Option<usize>,
+    max_width: usize,
+) -> usize {
+    let chars: Vec<char> = text.chars().collect();
+    let at_end_but_full = matches!(cursor_offset, Some(o) if o >= chars.len())
+        && chars.len() >= max_width
+        && !chars.is_empty();
+
+    let effective_offset = if at_end_but_full {
+        Some(chars.len() - 1)
+    } else {
+        cursor_offset
+    };
+
+    match effective_offset {
+        None => {
+            ab.append(text);
+            chars.len()
+        }
+        Some(offset) if offset < chars.len() => {
+            let before: String = chars[..offset].iter().collect();
+            let cursor_char = chars[offset];
+            let after: String = chars[offset + 1..].iter().collect();
+            ab.append(&before);
+            ab.append("\x1b[7m");
+            ab.append(&cursor_char.to_string());
+            ab.append("\x1b[27m");
+            ab.append(&after);
+            chars.len()
+        }
+        Some(_) => {
+            // Le curseur est juste apres le dernier caractere tape.
+            ab.append(text);
+            ab.append("\x1b[7m \x1b[27m");
+            chars.len() + 1
+        }
+    }
+}
+
+/// Dessine la barre de statut. Le curseur reel du terminal reste toujours
+/// sur le document ; un curseur custom (video inversee) est dessine
+/// directement dans le texte pour indiquer la position de saisie pendant
+/// un prompt ou une recherche.
+fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     if let Some(prompt_text) = &state.prompt_text {
         let line = format!(" {}", prompt_text);
         let (first, second) = wrap_message_two_lines(&line, state.screencols);
 
+        // Le curseur logique se trouve a `1 + offset` dans `line` (le " "
+        // ajoute en prefixe compte pour 1). On localise sur quelle ligne
+        // affichee (avant/apres le wrap) il tombe.
         let first_len = first.chars().count();
-        ab.append(&first);
-        for _ in first_len..state.screencols {
+        let line_total = line.chars().count();
+        let mut first_cursor = None;
+        let mut second_cursor = None;
+        if let Some(offset) = state.prompt_cursor_offset {
+            let target = (1 + offset).min(line_total);
+            if target <= first_len {
+                first_cursor = Some(target);
+            } else if second.is_some() {
+                second_cursor = Some(target - first_len);
+            } else {
+                first_cursor = Some(first_len);
+            }
+        }
+
+        let written = append_with_custom_cursor(ab, &first, first_cursor, state.screencols);
+        for _ in written..state.screencols {
             ab.append(" ");
         }
         ab.append("\r\n");
 
-        let mut cursor_pos = None;
-        // Le curseur logique se trouve a `1 + offset` dans `line` (le " "
-        // ajoute en prefixe compte pour 1). On localise sur quelle ligne
-        // affichee (avant/apres le wrap) il tombe.
-        if let Some(offset) = state.prompt_cursor_offset {
-            let target = (1 + offset).min(line.chars().count());
-            if target <= first_len {
-                cursor_pos = Some((0, target));
-            } else if second.is_some() {
-                cursor_pos = Some((1, target - first_len));
-            } else {
-                cursor_pos = Some((0, first_len));
-            }
-        }
-
         if let Some(second) = second {
-            let second_len = second.chars().count();
-            ab.append(&second);
-            for _ in second_len..state.screencols {
+            let written2 = append_with_custom_cursor(ab, &second, second_cursor, state.screencols);
+            for _ in written2..state.screencols {
                 ab.append(" ");
             }
             ab.append("\r\n");
         }
-        return cursor_pos;
+        return;
     }
 
     let ob = state.buffer_manager.active();
@@ -520,15 +582,14 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) -> Option<(usize, u
     let total = state.screencols;
     let left_len = left.chars().count().min(total);
     let left_trunc: String = left.chars().take(left_len).collect();
-    ab.append(&left_trunc);
 
-    let search_cursor_pos = if state.search.active {
+    let left_cursor = if state.search.active {
         let prefix_len = " recherche: ".chars().count();
-        let target = (prefix_len + state.search_term.chars().count()).min(left_len);
-        Some((0, target))
+        Some((prefix_len + state.search_term.chars().count()).min(left_len))
     } else {
         None
     };
+    append_with_custom_cursor(ab, &left_trunc, left_cursor, left_len);
 
     let right_len = right.chars().count();
     let center_len = center.chars().count();
@@ -564,8 +625,6 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) -> Option<(usize, u
     }
 
     ab.append("\r\n");
-
-    search_cursor_pos
 }
 
 fn draw_message_bar(ab: &mut AppendBuffer, state: &ViewState) {
@@ -660,7 +719,7 @@ pub fn refresh(state: &ViewState) -> String {
 
     draw_tab_bar(&mut ab, state);
     draw_rows(&mut ab, state);
-    let status_cursor = draw_status_bar(&mut ab, state);
+    draw_status_bar(&mut ab, state);
     draw_help_bar(&mut ab, state);
     draw_message_bar(&mut ab, state);
 
@@ -672,15 +731,10 @@ pub fn refresh(state: &ViewState) -> String {
         0
     };
 
-    if let Some((rel_row, col)) = status_cursor {
-        let status_bar_row = tab_bar_height + text_area_screen_rows(state);
-        let cursor_row = status_bar_row + rel_row + 1;
-        let cursor_col = col + 1;
-        ab.append(&format!("\x1b[{};{}H", cursor_row, cursor_col));
-        ab.append("\x1b[?25h");
-        return ab.data().to_string();
-    }
-
+    // Le curseur reel du terminal reste toujours sur le document, meme
+    // pendant un prompt ou une recherche : la position de saisie est
+    // indiquee separement par un curseur custom (video inversee) dessine
+    // dans draw_status_bar, pour qu'on voie les deux a la fois.
     let cursor_row = tab_bar_height + (ob.cursor.cy.saturating_sub(state.rowoff)) + 1;
     let cursor_col = gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;
     ab.append(&format!("\x1b[{};{}H", cursor_row, cursor_col));
@@ -729,5 +783,39 @@ mod tests {
         let (first, second) = wrap_message_two_lines("abc", 0);
         assert_eq!(first, "");
         assert_eq!(second, None);
+    }
+
+    #[test]
+    fn test_custom_cursor_in_middle_of_text() {
+        let mut ab = AppendBuffer::new();
+        let written = append_with_custom_cursor(&mut ab, "hello", Some(2), 20);
+        assert_eq!(written, 5);
+        assert_eq!(ab.data(), "he\x1b[7ml\x1b[27mlo");
+    }
+
+    #[test]
+    fn test_custom_cursor_at_end_with_room() {
+        let mut ab = AppendBuffer::new();
+        let written = append_with_custom_cursor(&mut ab, "hi", Some(2), 20);
+        assert_eq!(written, 3);
+        assert_eq!(ab.data(), "hi\x1b[7m \x1b[27m");
+    }
+
+    #[test]
+    fn test_custom_cursor_at_end_when_line_is_full() {
+        let mut ab = AppendBuffer::new();
+        // "hi" occupe deja toute la largeur disponible (2) : pas de place
+        // pour ajouter un espace-curseur, on inverse le dernier caractere.
+        let written = append_with_custom_cursor(&mut ab, "hi", Some(2), 2);
+        assert_eq!(written, 2);
+        assert_eq!(ab.data(), "h\x1b[7mi\x1b[27m");
+    }
+
+    #[test]
+    fn test_no_cursor_leaves_text_untouched() {
+        let mut ab = AppendBuffer::new();
+        let written = append_with_custom_cursor(&mut ab, "hello", None, 20);
+        assert_eq!(written, 5);
+        assert_eq!(ab.data(), "hello");
     }
 }
