@@ -1049,7 +1049,7 @@ impl Editor {
             }
 
             if key == ctrl('q') {
-                self.terminal.write(b"\x1b[?1049l");
+                self.terminal.shutdown();
                 std::process::exit(0);
             }
             if key == 0x1b {
@@ -1511,7 +1511,7 @@ impl Editor {
                     self.confirm_quit_with_unsaved_changes();
                     return;
                 }
-                self.terminal.write(b"\x1b[?1049l");
+                self.terminal.shutdown();
                 std::process::exit(0);
             }
 

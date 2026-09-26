@@ -123,6 +123,20 @@ impl Terminal {
         self.write(b"\x1b[?1006l\x1b[?1002l");
     }
 
+    /// Restaure completement l'etat du terminal avant de quitter le
+    /// programme : desactive le rapport souris, quitte l'ecran alternatif,
+    /// puis restaure le mode terminal d'origine (raw mode desactive).
+    /// A appeler explicitement avant tout `std::process::exit`, car
+    /// `process::exit` ne declenche jamais `Drop` : sans cet appel, le
+    /// terminal reste en mode rapport souris (la souris ne fonctionne
+    /// plus normalement dans le shell apres avoir quitte Cera) et en mode
+    /// raw.
+    pub fn shutdown(&mut self) {
+        self.disable_mouse_reporting();
+        self.write(b"\x1b[?1049l");
+        self.disable_raw_mode();
+    }
+
     pub fn last_mouse_event(&self) -> MouseEvent {
         self.last_mouse
     }
@@ -358,9 +372,7 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        self.disable_mouse_reporting();
-        self.write(b"\x1b[?1049l");
-        self.disable_raw_mode();
+        self.shutdown();
     }
 }
 
