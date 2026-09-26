@@ -68,6 +68,13 @@ impl Value {
             _ => None,
         }
     }
+
+    pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
+        match self {
+            Value::Object(map) => Some(map),
+            _ => None,
+        }
+    }
 }
 
 pub struct ParseResult {

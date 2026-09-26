@@ -26,7 +26,9 @@ pub struct ViewState<'a> {
     pub prompt_cursor_offset: Option<usize>,
     pub search: SearchDisplayInfo,
     pub search_term: String,
+    pub search_cursor: usize,
     pub config: &'a Config,
+    pub i18n: &'a crate::i18n::Translations,
 }
 
 pub struct AppendBuffer {
@@ -229,7 +231,7 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
         if filerow >= buffer.num_rows() {
             let is_single_empty_line = buffer.num_rows() == 1 && buffer.row(0).chars().is_empty();
             if is_single_empty_line && y == text_rows / 3 {
-                let welcome = "Cera editor -- version 0.1.0";
+                let welcome = state.i18n.t("ui.welcome_message");
                 let welcome_len = welcome.chars().count().min(text_cols);
                 let welcome: String = welcome.chars().take(welcome_len).collect();
                 let padding = (text_cols.saturating_sub(welcome_len)) / 2;
@@ -319,7 +321,7 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
         return;
     }
 
-    let entries = crate::view::help_text::short_help_entries();
+    let entries = crate::view::help_text::short_help_entries(state.i18n);
     let min_gap = 2usize;
 
     // Largeur naturelle de chaque paire empilee (haut, bas), sans jamais
@@ -551,22 +553,28 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let ob = state.buffer_manager.active();
     let buffer = &ob.buffer;
 
+    let search_prefix = format!(" {}", state.i18n.t("search.prefix"));
     let left = if state.search.active {
         format!(
-            " recherche: {} ({}/{})",
-            state.search_term, state.search.current_index, state.search.total_matches
+            "{}{} ({}/{})",
+            search_prefix,
+            state.search_term,
+            state.search.current_index,
+            state.search.total_matches
         )
     } else {
-        " ^H aide".to_string()
+        format!(" {}", state.i18n.t("help.toggle_hint"))
     };
 
-    let mut filename = buffer.filename().unwrap_or("[Sans nom]").to_string();
+    let no_name = state.i18n.t("doc.no_filename");
+    let mut filename = buffer.filename().unwrap_or(&no_name).to_string();
     if let Some(pos) = filename.rfind('/') {
         filename = filename[pos + 1..].to_string();
     }
     let mut center = filename;
     if buffer.dirty() {
-        center.push_str(" [modifie]");
+        center.push(' ');
+        center.push_str(&state.i18n.t("doc.modified_suffix"));
     }
 
     let total_lines = buffer.num_rows().max(1);
@@ -584,8 +592,8 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let left_trunc: String = left.chars().take(left_len).collect();
 
     let left_cursor = if state.search.active {
-        let prefix_len = " recherche: ".chars().count();
-        Some((prefix_len + state.search_term.chars().count()).min(left_len))
+        let prefix_len = search_prefix.chars().count();
+        Some((prefix_len + state.search_cursor).min(left_len))
     } else {
         None
     };
@@ -656,7 +664,7 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     let true_color = state.config.true_color;
 
     ab.append(&fg_sequence(theme.keyword1, true_color));
-    let title = " Documentation de Cera -- Echap pour revenir au fichier ";
+    let title = state.i18n.t("doc.title");
     let title_len = title.chars().count().min(state.screencols);
     let title_trunc: String = title.chars().take(title_len).collect();
     ab.append(&title_trunc);
@@ -665,18 +673,18 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\r\n");
 
     let mut rows_used = 1usize;
-    for cat in full_documentation() {
+    for cat in full_documentation(state.i18n) {
         if rows_used >= state.screenrows.saturating_sub(1) {
             break;
         }
         ab.append(&fg_sequence(theme.keyword1, true_color));
-        ab.append(cat.name);
+        ab.append(&cat.name);
         ab.append(reset_fg_sequence());
         ab.append("\x1b[K");
         ab.append("\r\n");
         rows_used += 1;
 
-        for entry in cat.entries {
+        for entry in &cat.entries {
             if rows_used >= state.screenrows.saturating_sub(1) {
                 break;
             }
