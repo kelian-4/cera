@@ -10,7 +10,7 @@ use crate::model::selection::Position;
 use crate::model::utf8;
 use crate::syntax;
 use crate::terminal::{self, MouseEvent, Terminal};
-use crate::view::help_text::{short_help_line, MessageKind};
+use crate::view::help_text::MessageKind;
 use crate::view::screen_renderer::{self, SearchDisplayInfo, ViewState};
 
 fn ctrl(c: char) -> i32 {
@@ -23,6 +23,7 @@ pub struct Editor {
     syntax_db: Vec<syntax::Syntax>,
     clipboard: Clipboard,
     config: Config,
+    i18n: crate::i18n::Translations,
 
     screenrows: usize,
     screencols: usize,
@@ -33,18 +34,23 @@ pub struct Editor {
 
     quit_times: i32,
 
-    show_help_bar: bool,
     overlay_full_doc: bool,
+    help_active: bool,
+    prompt_text: Option<String>,
+    prompt_cursor_offset: Option<usize>,
 
     search_active: bool,
     search_term: String,
+    search_cursor: usize,
     search_current_match: usize,
     search_total_matches: usize,
 }
 
 impl Editor {
     pub fn new() -> io::Result<Self> {
-        let (config, _loaded) = crate::io::config::load_from_file(&crate::io::config::default_config_path());
+        let config_path = crate::io::config::default_config_path();
+        crate::io::config::ensure_config_file_exists(&config_path);
+        let (config, _loaded) = crate::io::config::load_from_file(&config_path);
         row::set_tab_stop(config.tab_stop);
 
         let mut terminal = Terminal::new()?;
@@ -57,6 +63,7 @@ impl Editor {
 
         let syntax_db = syntax::build_database();
         let buffer_manager = BufferManager::new();
+        let i18n = crate::i18n::load(config.language.as_deref());
 
         Ok(Editor {
             terminal,
@@ -65,15 +72,19 @@ impl Editor {
             clipboard: Clipboard::new(),
             quit_times: config.quit_times,
             config,
+            i18n,
             screenrows: rows as usize,
             screencols: cols as usize,
             status_message: String::new(),
             status_message_kind: MessageKind::Info,
             status_message_time: std::time::Instant::now(),
-            show_help_bar: false,
             overlay_full_doc: false,
+            help_active: false,
+            prompt_text: None,
+            prompt_cursor_offset: None,
             search_active: false,
             search_term: String::new(),
+            search_cursor: 0,
             search_current_match: 0,
             search_total_matches: 0,
         })
@@ -102,7 +113,7 @@ impl Editor {
         }
     }
 
-    fn build_view_state(&self, search: SearchDisplayInfo) -> ViewState {
+    fn build_view_state(&self, search: SearchDisplayInfo) -> ViewState<'_> {
         let ob = self.buffer_manager.active();
         ViewState {
             buffer_manager: &self.buffer_manager,
@@ -114,10 +125,14 @@ impl Editor {
             status_message_kind: self.status_message_kind,
             status_message_age_seconds: self.status_message_time.elapsed().as_secs() as i64,
             overlay_full_doc: self.overlay_full_doc,
-            show_help_bar: self.show_help_bar,
+            help_active: self.help_active,
+            prompt_text: self.prompt_text.clone(),
+            prompt_cursor_offset: self.prompt_cursor_offset,
             search,
             search_term: self.search_term.clone(),
+            search_cursor: self.search_cursor,
             config: &self.config,
+            i18n: &self.i18n,
         }
     }
 
@@ -165,8 +180,6 @@ impl Editor {
     }
 
     pub fn run(&mut self) -> ! {
-        self.set_status_message(short_help_line());
-
         loop {
             self.refresh_screen();
             self.process_keypress();
@@ -198,7 +211,10 @@ impl Editor {
             terminal::ARROW_RIGHT => {
                 if has_row && cursor.cx < ob.buffer.row(cursor.cy).size() {
                     cursor.cx += 1;
-                } else if has_row && cursor.cx == ob.buffer.row(cursor.cy).size() {
+                } else if has_row
+                    && cursor.cx == ob.buffer.row(cursor.cy).size()
+                    && cursor.cy + 1 < ob.buffer.num_rows()
+                {
                     cursor.cy += 1;
                     cursor.cx = 0;
                 }
@@ -208,16 +224,18 @@ impl Editor {
                     cursor.cy -= 1;
                 }
             }
-            terminal::ARROW_DOWN => {
-                if cursor.cy < ob.buffer.num_rows() {
-                    cursor.cy += 1;
-                }
+            terminal::ARROW_DOWN if cursor.cy + 1 < ob.buffer.num_rows() => {
+                cursor.cy += 1;
             }
             _ => {}
         }
 
         has_row = cursor.cy < ob.buffer.num_rows();
-        let rowlen = if has_row { ob.buffer.row(cursor.cy).size() } else { 0 };
+        let rowlen = if has_row {
+            ob.buffer.row(cursor.cy).size()
+        } else {
+            0
+        };
         if cursor.cx > rowlen {
             cursor.cx = rowlen;
         }
@@ -234,7 +252,9 @@ impl Editor {
         if from.row == to.row {
             return buf.row(from.row).substr_by_char(from.col, to.col);
         }
-        let mut result = buf.row(from.row).substr_by_char(from.col, buf.row(from.row).size());
+        let mut result = buf
+            .row(from.row)
+            .substr_by_char(from.col, buf.row(from.row).size());
         result.push('\n');
         for r in (from.row + 1)..to.row {
             result.push_str(buf.row(r).chars());
@@ -253,11 +273,17 @@ impl Editor {
 
         for (seg_idx, segment) in segments.iter().enumerate() {
             for c in segment.chars() {
-                self.buffer_manager.active_mut().buffer.insert_char(row, col, c);
+                self.buffer_manager
+                    .active_mut()
+                    .buffer
+                    .insert_char(row, col, c);
                 col += 1;
             }
             if seg_idx != last_idx {
-                self.buffer_manager.active_mut().buffer.insert_newline(row, col);
+                self.buffer_manager
+                    .active_mut()
+                    .buffer
+                    .insert_newline(row, col);
                 row += 1;
                 col = 0;
             }
@@ -288,7 +314,9 @@ impl Editor {
                     buf.delete_char(from.row, i + 1);
                 }
             } else {
-                let tail_after = buf.row(to.row).substr_by_char(to.col, buf.row(to.row).size());
+                let tail_after = buf
+                    .row(to.row)
+                    .substr_by_char(to.col, buf.row(to.row).size());
                 let head = buf.row(from.row).substr_by_char(0, from.col);
                 for r in (from.row + 1..=to.row).rev() {
                     buf.delete_row(r);
@@ -359,7 +387,11 @@ impl Editor {
         let cursor_row = ob.cursor.cy;
         if let Some(sidx) = active_syntax_idx {
             let syn = &self.syntax_db[sidx];
-            syntax::update_syntax(&mut self.buffer_manager.active_mut().buffer, cursor_row, Some(syn));
+            syntax::update_syntax(
+                &mut self.buffer_manager.active_mut().buffer,
+                cursor_row,
+                Some(syn),
+            );
         }
 
         let ob = self.buffer_manager.active_mut();
@@ -389,7 +421,10 @@ impl Editor {
         let before = Position::new(ob.cursor.cy, ob.cursor.cx);
         let (cy, cx) = (ob.cursor.cy, ob.cursor.cx);
 
-        self.buffer_manager.active_mut().buffer.insert_newline(cy, cx);
+        self.buffer_manager
+            .active_mut()
+            .buffer
+            .insert_newline(cy, cx);
 
         let ob = self.buffer_manager.active();
         let active_syntax_idx = ob.active_syntax_idx;
@@ -437,7 +472,9 @@ impl Editor {
 
         let before = Position::new(ob.cursor.cy, ob.cursor.cx);
         let removed = if ob.cursor.cx > 0 {
-            ob.buffer.row(ob.cursor.cy).substr_by_char(ob.cursor.cx - 1, ob.cursor.cx)
+            ob.buffer
+                .row(ob.cursor.cy)
+                .substr_by_char(ob.cursor.cx - 1, ob.cursor.cx)
         } else {
             "\n".to_string()
         };
@@ -493,13 +530,20 @@ impl Editor {
         let before = Position::new(ob.cursor.cy, ob.cursor.cx);
 
         let (target_row, target_col, removed) = if !at_line_end {
-            let removed = ob.buffer.row(ob.cursor.cy).substr_by_char(ob.cursor.cx, ob.cursor.cx + 1);
+            let removed = ob
+                .buffer
+                .row(ob.cursor.cy)
+                .substr_by_char(ob.cursor.cx, ob.cursor.cx + 1);
             (ob.cursor.cy, ob.cursor.cx + 1, removed)
         } else {
             (ob.cursor.cy + 1, 0, "\n".to_string())
         };
 
-        let pos = self.buffer_manager.active_mut().buffer.delete_char(target_row, target_col);
+        let pos = self
+            .buffer_manager
+            .active_mut()
+            .buffer
+            .delete_char(target_row, target_col);
 
         let ob = self.buffer_manager.active_mut();
         ob.cursor.cy = pos.row;
@@ -542,7 +586,11 @@ impl Editor {
         let line_text = ob.buffer.row(row).chars().to_string();
 
         let (from, to, removed) = if last_row && ob.buffer.num_rows() == 1 {
-            (Position::new(row, 0), Position::new(row, ob.buffer.row(row).size()), line_text.clone())
+            (
+                Position::new(row, 0),
+                Position::new(row, ob.buffer.row(row).size()),
+                line_text.clone(),
+            )
         } else if last_row {
             let prev_size = ob.buffer.row(row - 1).size();
             (
@@ -576,24 +624,30 @@ impl Editor {
         };
         ob.undo_stack.push(action);
 
-        self.set_status_message("Ligne coupee");
+        self.set_status_message(self.i18n.t("status.line_cut"));
     }
 
     fn save(&mut self) {
         let has_filename = self.buffer_manager.active().buffer.filename().is_some();
 
         if !has_filename {
-            let filename = self.prompt("Sauvegarder sous : %s (Echap pour annuler)");
+            let filename = self.prompt(&self.i18n.t("status.save_as_prompt"));
             let filename = match filename {
                 Some(f) if !f.is_empty() => f,
                 _ => {
-                    self.set_status_message("Sauvegarde annulee");
+                    self.set_status_message(self.i18n.t("status.save_cancelled"));
                     return;
                 }
             };
 
-            self.buffer_manager.active_mut().buffer.set_filename(&filename);
-            let syntax_idx = self.syntax_db.iter().position(|s| syntax::matches(s, &filename));
+            self.buffer_manager
+                .active_mut()
+                .buffer
+                .set_filename(&filename);
+            let syntax_idx = self
+                .syntax_db
+                .iter()
+                .position(|s| syntax::matches(s, &filename));
             self.buffer_manager.active_mut().active_syntax_idx = syntax_idx;
 
             if let Some(sidx) = syntax_idx {
@@ -606,23 +660,36 @@ impl Editor {
             }
         }
 
-        let filename = self.buffer_manager.active().buffer.filename().unwrap().to_string();
+        let filename = self
+            .buffer_manager
+            .active()
+            .buffer
+            .filename()
+            .unwrap()
+            .to_string();
         match file_io::save_file(&mut self.buffer_manager.active_mut().buffer) {
             Ok(()) => {
                 self.set_status_message_kind(filename, MessageKind::Success);
             }
             Err(e) => {
-                self.set_status_message_kind(format!("Erreur de sauvegarde : {}", e), MessageKind::Error);
+                let msg = self.i18n.t1("status.save_error", &e.to_string());
+                self.set_status_message_kind(msg, MessageKind::Error);
             }
         }
     }
 
     fn prompt(&mut self, prompt_fmt: &str) -> Option<String> {
-        let mut buf = String::new();
+        let mut buf: Vec<char> = Vec::new();
+        let mut cursor = 0usize;
+        let prefix_chars = prompt_fmt
+            .find("%s")
+            .map(|byte_idx| prompt_fmt[..byte_idx].chars().count());
 
         loop {
-            let msg = prompt_fmt.replace("%s", &buf);
-            self.set_status_message(msg);
+            let buf_str: String = buf.iter().collect();
+            let msg = prompt_fmt.replace("%s", &buf_str);
+            self.prompt_text = Some(msg);
+            self.prompt_cursor_offset = prefix_chars.map(|prefix| prefix + cursor);
             self.refresh_screen();
 
             let c = match self.terminal.read_key() {
@@ -635,20 +702,40 @@ impl Editor {
                 continue;
             }
 
-            if c == terminal::DEL_KEY || c == ctrl('h') || c == terminal::BACKSPACE {
-                buf.pop();
+            if c == terminal::ARROW_LEFT {
+                cursor = cursor.saturating_sub(1);
+                continue;
+            }
+            if c == terminal::ARROW_RIGHT {
+                cursor = (cursor + 1).min(buf.len());
+                continue;
+            }
+
+            if c == terminal::DEL_KEY {
+                if cursor < buf.len() {
+                    buf.remove(cursor);
+                }
+            } else if c == ctrl('h') || c == terminal::BACKSPACE {
+                if cursor > 0 {
+                    cursor -= 1;
+                    buf.remove(cursor);
+                }
             } else if c == 0x1b {
-                self.set_status_message("");
+                self.prompt_text = None;
+                self.prompt_cursor_offset = None;
                 return None;
             } else if c == '\r' as i32 {
                 if !buf.is_empty() {
-                    self.set_status_message("");
-                    return Some(buf);
+                    self.prompt_text = None;
+                    self.prompt_cursor_offset = None;
+                    return Some(buf.iter().collect());
                 }
             } else if terminal::is_encoded_codepoint(c) {
-                buf.push(terminal::decode_codepoint(c));
+                buf.insert(cursor, terminal::decode_codepoint(c));
+                cursor += 1;
             } else if !(c as u8 as char).is_control() && c < 128 {
-                buf.push(c as u8 as char);
+                buf.insert(cursor, c as u8 as char);
+                cursor += 1;
             }
         }
     }
@@ -664,12 +751,14 @@ impl Editor {
             } else {
                 let buf = &mut self.buffer_manager.active_mut().buffer;
                 let hl = buf.row_mut(r).hl_mut();
-                hl.iter_mut().for_each(|h| *h = crate::model::row::Highlight::Normal);
+                hl.iter_mut()
+                    .for_each(|h| *h = crate::model::row::Highlight::Normal);
             }
         }
     }
 
     fn update_find_highlight(&mut self) {
+        self.clear_find_highlight();
         self.search_total_matches = 0;
         if self.search_term.is_empty() {
             return;
@@ -680,19 +769,26 @@ impl Editor {
         let cursor_col = ob.cursor.cx;
         let num_rows = ob.buffer.num_rows();
         let term = self.search_term.clone();
+        let term_char_len = utf8::codepoint_count(&term);
 
         let mut match_containing_cursor = 0usize;
 
         for r in 0..num_rows {
-            let render = self.buffer_manager.active().buffer.row(r).render().to_string();
+            let render = self
+                .buffer_manager
+                .active()
+                .buffer
+                .row(r)
+                .render()
+                .to_string();
             let mut search_from = 0usize;
-            while let Some(pos) = render[search_from..].find(&term) {
-                let abs_pos = search_from + pos;
+            while let Some(abs_pos) = utf8::find_pattern(&render, &term, search_from) {
                 self.search_total_matches += 1;
+
+                let match_char_idx = utf8::char_index_for_byte_offset(&render, abs_pos);
 
                 match r.cmp(&cursor_row) {
                     std::cmp::Ordering::Equal => {
-                        let match_char_idx = utf8::char_index_for_byte_offset(&render, abs_pos);
                         if match_char_idx <= cursor_col {
                             match_containing_cursor = self.search_total_matches;
                         }
@@ -701,6 +797,13 @@ impl Editor {
                         match_containing_cursor = self.search_total_matches;
                     }
                     std::cmp::Ordering::Greater => {}
+                }
+
+                let row_mut = self.buffer_manager.active_mut().buffer.row_mut(r);
+                let hl = row_mut.hl_mut();
+                let end_idx = (match_char_idx + term_char_len).min(hl.len());
+                for slot in hl.iter_mut().take(end_idx).skip(match_char_idx) {
+                    *slot = crate::model::row::Highlight::Match;
                 }
 
                 search_from = abs_pos + 1;
@@ -725,46 +828,48 @@ impl Editor {
         let term = self.search_term.clone();
 
         let mut row = start_row;
-        for _ in 0..=num_rows {
-            let render = self.buffer_manager.active().buffer.row(row).render().to_string();
+        for step in 0..=num_rows {
+            let is_first_pass = step == 0;
+            let is_final_wrap = step == num_rows;
+            let render = self
+                .buffer_manager
+                .active()
+                .buffer
+                .row(row)
+                .render()
+                .to_string();
 
             if direction > 0 {
-                let from_col = if row == start_row { start_col + 1 } else { 0 };
+                let from_col = if is_first_pass { start_col + 1 } else { 0 };
                 let byte_from = utf8::byte_offset_for_char_index(&render, from_col);
                 if byte_from <= render.len() {
-                    if let Some(pos) = render[byte_from..].find(&term) {
-                        let abs_pos = byte_from + pos;
-                        let ob = self.buffer_manager.active_mut();
-                        ob.cursor.cy = row;
-                        ob.cursor.cx = utf8::char_index_for_byte_offset(&render, abs_pos);
-                        self.update_find_highlight();
-                        return;
+                    if let Some(abs_pos) = utf8::find_pattern(&render, &term, byte_from) {
+                        let match_col = utf8::char_index_for_byte_offset(&render, abs_pos);
+                        if !(is_final_wrap && match_col > start_col) {
+                            let ob = self.buffer_manager.active_mut();
+                            ob.cursor.cy = row;
+                            ob.cursor.cx = match_col;
+                            self.update_find_highlight();
+                            return;
+                        }
                     }
                 }
             } else {
-                let upto = if row == start_row { start_col } else { self.buffer_manager.active().buffer.row(row).size() + 1 };
+                let upto = if is_first_pass {
+                    start_col
+                } else {
+                    self.buffer_manager.active().buffer.row(row).size() + 1
+                };
                 let byte_upto = utf8::byte_offset_for_char_index(&render, upto).min(render.len());
-                let mut last_pos: Option<usize> = None;
-                let mut search_pos = 0usize;
-                while search_pos < byte_upto {
-                    match render[search_pos..].find(&term) {
-                        Some(p) => {
-                            let abs = search_pos + p;
-                            if abs >= byte_upto {
-                                break;
-                            }
-                            last_pos = Some(abs);
-                            search_pos = abs + 1;
-                        }
-                        None => break,
+                if let Some(pos) = utf8::rfind_pattern_before(&render, &term, byte_upto) {
+                    let match_col = utf8::char_index_for_byte_offset(&render, pos);
+                    if !(is_final_wrap && match_col < start_col) {
+                        let ob = self.buffer_manager.active_mut();
+                        ob.cursor.cy = row;
+                        ob.cursor.cx = match_col;
+                        self.update_find_highlight();
+                        return;
                     }
-                }
-                if let Some(pos) = last_pos {
-                    let ob = self.buffer_manager.active_mut();
-                    ob.cursor.cy = row;
-                    ob.cursor.cx = utf8::char_index_for_byte_offset(&render, pos);
-                    self.update_find_highlight();
-                    return;
                 }
             }
 
@@ -775,7 +880,7 @@ impl Editor {
             };
         }
 
-        self.set_status_message("Aucune occurrence trouvee");
+        self.set_status_message(self.i18n.t("status.no_match_found"));
     }
 
     fn find(&mut self) {
@@ -785,10 +890,10 @@ impl Editor {
         };
         self.search_active = true;
         self.search_term.clear();
+        self.search_cursor = 0;
+        self.set_status_message("");
 
         loop {
-            let msg = format!("Rechercher: {}", self.search_term);
-            self.set_status_message(msg);
             self.refresh_screen();
 
             let c = match self.terminal.read_key() {
@@ -810,28 +915,48 @@ impl Editor {
                 }
                 continue;
             }
-            if c == terminal::ARROW_DOWN || c == terminal::ARROW_RIGHT {
+            if c == terminal::ARROW_DOWN {
                 if !self.search_term.is_empty() {
                     self.find_next(1);
                 }
                 continue;
             }
-            if c == terminal::ARROW_UP || c == terminal::ARROW_LEFT {
+            if c == terminal::ARROW_UP {
                 if !self.search_term.is_empty() {
                     self.find_next(-1);
                 }
                 continue;
             }
+            if c == terminal::ARROW_LEFT {
+                self.search_cursor = self.search_cursor.saturating_sub(1);
+                continue;
+            }
+            if c == terminal::ARROW_RIGHT {
+                let max = self.search_term.chars().count();
+                self.search_cursor = (self.search_cursor + 1).min(max);
+                continue;
+            }
 
-            if c == terminal::DEL_KEY || c == ctrl('h') || c == terminal::BACKSPACE {
-                self.search_term.pop();
+            let mut chars: Vec<char> = self.search_term.chars().collect();
+            if c == terminal::DEL_KEY {
+                if self.search_cursor < chars.len() {
+                    chars.remove(self.search_cursor);
+                }
+            } else if c == ctrl('h') || c == terminal::BACKSPACE {
+                if self.search_cursor > 0 {
+                    self.search_cursor -= 1;
+                    chars.remove(self.search_cursor);
+                }
             } else if terminal::is_encoded_codepoint(c) {
-                self.search_term.push(terminal::decode_codepoint(c));
+                chars.insert(self.search_cursor, terminal::decode_codepoint(c));
+                self.search_cursor += 1;
             } else if !(c as u8 as char).is_control() && c < 128 {
-                self.search_term.push(c as u8 as char);
+                chars.insert(self.search_cursor, c as u8 as char);
+                self.search_cursor += 1;
             } else {
                 continue;
             }
+            self.search_term = chars.into_iter().collect();
 
             let ob = self.buffer_manager.active_mut();
             ob.cursor.cy = start_pos.row;
@@ -848,37 +973,123 @@ impl Editor {
     }
 
     fn goto_line(&mut self) {
-        let result = self.prompt("Aller a la ligne: %s (Echap pour annuler)");
+        let result = self.prompt(&self.i18n.t("status.goto_prompt"));
         let result = match result {
             Some(r) => r,
             None => return,
         };
 
-        let line_num: i64 = match result.trim().parse() {
+        let trimmed = result.trim();
+        let parts: Vec<&str> = trimmed.splitn(2, ',').collect();
+
+        let line_str = parts[0].trim();
+        if line_str.is_empty() {
+            let msg = self.i18n.t("status.line_number_required");
+            self.set_status_message_kind(msg, MessageKind::Error);
+            return;
+        }
+
+        let line_num: i64 = match line_str.parse() {
             Ok(n) if n > 0 => n,
             _ => {
-                self.set_status_message_kind("Numero de ligne invalide", MessageKind::Error);
+                let msg = self.i18n.t("status.line_number_invalid");
+                self.set_status_message_kind(msg, MessageKind::Error);
                 return;
             }
         };
 
+        let col_num: Option<i64> = if parts.len() == 2 {
+            let col_str = parts[1].trim();
+            if col_str.is_empty() {
+                None
+            } else {
+                match col_str.parse::<i64>() {
+                    Ok(n) if n > 0 => Some(n),
+                    _ => {
+                        let msg = self.i18n.t("status.column_number_invalid");
+                        self.set_status_message_kind(msg, MessageKind::Error);
+                        return;
+                    }
+                }
+            }
+        } else {
+            None
+        };
+
         let ob = self.buffer_manager.active_mut();
-        let mut target = (line_num - 1) as usize;
-        if target >= ob.buffer.num_rows() {
-            target = ob.buffer.num_rows().saturating_sub(1);
+        let mut target_row = (line_num - 1) as usize;
+        if target_row >= ob.buffer.num_rows() {
+            target_row = ob.buffer.num_rows().saturating_sub(1);
         }
 
-        ob.cursor.cy = target;
-        ob.cursor.cx = 0;
+        let row_size = ob.buffer.row(target_row).size();
+        let target_col = match col_num {
+            Some(c) => ((c - 1) as usize).min(row_size),
+            None => 0,
+        };
+
+        ob.cursor.cy = target_row;
+        ob.cursor.cx = target_col;
         ob.selection.is_active = false;
     }
 
+    fn confirm_quit_with_unsaved_changes(&mut self) {
+        self.prompt_text = Some(self.i18n.t("status.confirm_quit_unsaved"));
+        self.prompt_cursor_offset = None;
+
+        loop {
+            self.refresh_screen();
+
+            let mut key = terminal::NO_KEY;
+            while key == terminal::NO_KEY {
+                key = self.terminal.read_key().unwrap_or(terminal::NO_KEY);
+                if key == terminal::NO_KEY {
+                    self.apply_resize_if_needed();
+                }
+            }
+
+            if key == ctrl('q') {
+                self.terminal.shutdown();
+                std::process::exit(0);
+            }
+            if key == 0x1b {
+                self.prompt_text = None;
+                self.quit_times = self.config.quit_times;
+                return;
+            }
+            // Toute autre touche est ignoree : c'est une vraie confirmation
+            // modale, le bandeau reste affiche tant que Ctrl-Q ou Echap
+            // n'a pas ete presse.
+        }
+    }
+
+    fn pattern_exists_in_buffer(&self, term: &str) -> bool {
+        let ob = self.buffer_manager.active();
+        let num_rows = ob.buffer.num_rows();
+        for r in 0..num_rows {
+            let render = ob.buffer.row(r).render();
+            if utf8::find_pattern(render, term, 0).is_some() {
+                return true;
+            }
+        }
+        false
+    }
+
     fn replace(&mut self) {
-        let search_term = match self.prompt("Entre le mot a remplacer: %s (Echap pour annuler)") {
+        let search_term = match self.prompt(&self.i18n.t("status.replace_search_prompt")) {
             Some(s) if !s.is_empty() => s,
             _ => return,
         };
-        let replace_with = self.prompt("Remplacer par: %s (Echap pour annuler)").unwrap_or_default();
+
+        if !self.pattern_exists_in_buffer(&search_term) {
+            let msg = self.i18n.t1("status.pattern_not_found", &search_term);
+            self.set_status_message_kind(msg, MessageKind::Error);
+            return;
+        }
+
+        let replace_with = self
+            .prompt(&self.i18n.t("status.replace_with_prompt"))
+            .unwrap_or_default();
 
         let num_rows = self.buffer_manager.active().buffer.num_rows();
         let mut replaced_count = 0i32;
@@ -887,9 +1098,15 @@ impl Editor {
         for r in 0..num_rows {
             let mut search_from_byte = 0usize;
             loop {
-                let render = self.buffer_manager.active().buffer.row(r).render().to_string();
-                let pos = match render[search_from_byte..].find(&search_term) {
-                    Some(p) => search_from_byte + p,
+                let render = self
+                    .buffer_manager
+                    .active()
+                    .buffer
+                    .row(r)
+                    .render()
+                    .to_string();
+                let pos = match utf8::find_pattern(&render, &search_term, search_from_byte) {
+                    Some(p) => p,
                     None => break,
                 };
 
@@ -906,9 +1123,10 @@ impl Editor {
                     self.search_active = true;
                     self.search_term = search_term.clone();
                     self.update_find_highlight();
-                    self.refresh_screen();
 
-                    self.set_status_message("Remplacer cette occurrence ? (o)ui / (n)on / (t)out / Echap pour arreter");
+                    let confirm_msg = self.i18n.t1("status.confirm_replace", &search_term);
+                    self.prompt_text = Some(confirm_msg);
+                    self.prompt_cursor_offset = None;
                     self.refresh_screen();
 
                     let mut key = terminal::NO_KEY;
@@ -919,18 +1137,35 @@ impl Editor {
                         }
                     }
                     self.search_active = false;
+                    self.prompt_text = None;
 
                     if key == 0x1b {
                         self.clear_find_highlight();
-                        self.set_status_message("Remplacement interrompu");
+                        let msg = self.i18n.t("status.replace_interrupted");
+                        self.set_status_message(msg);
                         return;
                     }
 
-                    if key == 't' as i32 || key == 'T' as i32 {
+                    let yes_key = self
+                        .i18n
+                        .t("status.confirm_yes_key")
+                        .chars()
+                        .next()
+                        .unwrap_or('y');
+                    let all_key = self
+                        .i18n
+                        .t("status.confirm_all_key")
+                        .chars()
+                        .next()
+                        .unwrap_or('a');
+                    let key_char = char::from_u32(key as u32).unwrap_or('\0');
+                    let key_lower = key_char.to_ascii_lowercase();
+
+                    if key_lower == all_key.to_ascii_lowercase() {
                         replace_all = true;
                         true
                     } else {
-                        key == 'o' as i32 || key == 'O' as i32
+                        key_lower == yes_key.to_ascii_lowercase()
                     }
                 };
 
@@ -938,7 +1173,10 @@ impl Editor {
                     let char_count = utf8::codepoint_count(&search_term);
                     let start = Position::new(r, char_idx);
                     for _ in 0..char_count {
-                        self.buffer_manager.active_mut().buffer.delete_char(r, char_idx + 1);
+                        self.buffer_manager
+                            .active_mut()
+                            .buffer
+                            .delete_char(r, char_idx + 1);
                     }
                     let end_pos = self.insert_text_at(start, &replace_with);
 
@@ -967,7 +1205,9 @@ impl Editor {
         }
 
         self.clear_find_highlight();
-        let msg = format!("{} remplacement(s) effectue(s)", replaced_count);
+        let msg = self
+            .i18n
+            .t1("status.replace_count", &replaced_count.to_string());
         self.set_status_message_kind(msg, MessageKind::Success);
     }
 
@@ -985,7 +1225,8 @@ impl Editor {
         let action = match action {
             Some(a) => a,
             None => {
-                self.set_status_message("Rien a annuler");
+                let msg = self.i18n.t("status.nothing_to_undo");
+                self.set_status_message(msg);
                 return;
             }
         };
@@ -1005,7 +1246,8 @@ impl Editor {
         ob.cursor.cy = action.cursor_before.row;
         ob.cursor.cx = action.cursor_before.col;
 
-        self.set_status_message("Annule");
+        let msg = self.i18n.t("status.undone");
+        self.set_status_message(msg);
     }
 
     fn redo(&mut self) {
@@ -1013,7 +1255,8 @@ impl Editor {
         let action = match action {
             Some(a) => a,
             None => {
-                self.set_status_message("Rien a retablir");
+                let msg = self.i18n.t("status.nothing_to_redo");
+                self.set_status_message(msg);
                 return;
             }
         };
@@ -1033,7 +1276,8 @@ impl Editor {
         ob.cursor.cy = action.cursor_after.row;
         ob.cursor.cx = action.cursor_after.col;
 
-        self.set_status_message("Retabli");
+        let msg = self.i18n.t("status.redone");
+        self.set_status_message(msg);
     }
 
     fn copy_selection(&mut self) {
@@ -1042,7 +1286,8 @@ impl Editor {
             ob.selection.is_active && !ob.selection.is_empty()
         };
         if !has_selection {
-            self.set_status_message("Aucune selection a copier");
+            let msg = self.i18n.t("status.nothing_to_copy");
+            self.set_status_message(msg);
             return;
         }
         let (start, end) = {
@@ -1051,11 +1296,12 @@ impl Editor {
         };
         let text = self.text_in_range(start, end);
         let ok = self.clipboard.copy(&text);
-        self.set_status_message(if ok {
-            "Copie dans le presse-papier systeme"
+        let msg = if ok {
+            self.i18n.t("status.copied_system_clipboard")
         } else {
-            "Copie (presse-papier interne)"
-        });
+            self.i18n.t("status.copied_internal_clipboard")
+        };
+        self.set_status_message(msg);
     }
 
     fn cut_selection(&mut self) {
@@ -1064,7 +1310,8 @@ impl Editor {
             ob.selection.is_active && !ob.selection.is_empty()
         };
         if !has_selection {
-            self.set_status_message("Aucune selection a couper");
+            let msg = self.i18n.t("status.nothing_to_cut");
+            self.set_status_message(msg);
             return;
         }
         let (start, end) = {
@@ -1074,13 +1321,15 @@ impl Editor {
         let text = self.text_in_range(start, end);
         self.clipboard.copy(&text);
         self.delete_selection();
-        self.set_status_message("Coupe");
+        let msg = self.i18n.t("status.cut");
+        self.set_status_message(msg);
     }
 
     fn paste_clipboard(&mut self) {
         let text = self.clipboard.paste();
         if text.is_empty() {
-            self.set_status_message("Presse-papier vide");
+            let msg = self.i18n.t("status.clipboard_empty");
+            self.set_status_message(msg);
             return;
         }
 
@@ -1112,11 +1361,12 @@ impl Editor {
         };
         ob.undo_stack.push(action);
 
-        self.set_status_message("Colle");
+        let msg = self.i18n.t("status.pasted");
+        self.set_status_message(msg);
     }
 
-    fn toggle_help_bar(&mut self) {
-        self.show_help_bar = !self.show_help_bar;
+    fn toggle_help(&mut self) {
+        self.help_active = !self.help_active;
     }
 
     fn toggle_full_doc(&mut self) {
@@ -1125,24 +1375,33 @@ impl Editor {
 
     fn handle_mouse_event(&mut self, ev: MouseEvent) {
         if ev.is_wheel {
-            let search = SearchDisplayInfo::default();
-            let state = self.build_view_state(search);
-            let text_rows = screen_renderer::text_area_screen_rows(&state);
             let ob = self.buffer_manager.active_mut();
-            let delta = ev.wheel_delta * 3;
-            if delta < 0 {
-                ob.rowoff = ob.rowoff.saturating_sub((-delta) as usize);
+            if ob.buffer.num_rows() == 0 {
+                return;
+            }
+            let lines_per_step = 3i32;
+            let delta = ev.wheel_delta * lines_per_step;
+
+            let new_cy = if delta < 0 {
+                ob.cursor.cy.saturating_sub((-delta) as usize)
             } else {
-                ob.rowoff += delta as usize;
+                (ob.cursor.cy + delta as usize).min(ob.buffer.num_rows() - 1)
+            };
+
+            ob.cursor.cy = new_cy;
+            let row_len = ob.buffer.row(new_cy).size();
+            if ob.cursor.cx > row_len {
+                ob.cursor.cx = row_len;
             }
-            let max_off = ob.buffer.num_rows().saturating_sub(text_rows);
-            if ob.rowoff > max_off {
-                ob.rowoff = max_off;
-            }
+            ob.selection.is_active = false;
             return;
         }
 
-        let tab_bar_height = if self.buffer_manager.count() > 1 { 1 } else { 0 };
+        let tab_bar_height = if self.buffer_manager.count() > 1 {
+            1
+        } else {
+            0
+        };
 
         if tab_bar_height > 0 && ev.y == 0 && ev.pressed && !ev.is_drag {
             let mut col = 0i32;
@@ -1249,15 +1508,10 @@ impl Editor {
 
             k if k == ctrl('q') => {
                 if self.buffer_manager.any_dirty() && self.quit_times > 0 {
-                    let msg = format!(
-                        "ATTENTION ! Des modifications ne sont pas sauvegardees. Appuyez sur Ctrl-Q {} fois de plus pour quitter.",
-                        self.quit_times
-                    );
-                    self.set_status_message_kind(msg, MessageKind::Error);
-                    self.quit_times -= 1;
+                    self.confirm_quit_with_unsaved_changes();
                     return;
                 }
-                self.terminal.write(b"\x1b[?1049l");
+                self.terminal.shutdown();
                 std::process::exit(0);
             }
 
@@ -1272,7 +1526,7 @@ impl Editor {
             k if k == ctrl('l') => self.goto_line(),
             k if k == ctrl('n') => self.buffer_manager.next(),
             k if k == ctrl('p') => self.buffer_manager.previous(),
-            k if k == ctrl('h') => self.toggle_help_bar(),
+            k if k == ctrl('h') => self.toggle_help(),
             k if k == ctrl('d') => self.toggle_full_doc(),
             k if k == ctrl('k') => self.cut_current_line(),
 
@@ -1299,13 +1553,11 @@ impl Editor {
                 let text_rows = screen_renderer::text_area_screen_rows(&state);
 
                 let ob = self.buffer_manager.active_mut();
+                let last_row = ob.buffer.num_rows().saturating_sub(1);
                 if c == terminal::PAGE_UP {
-                    ob.cursor.cy = ob.rowoff;
+                    ob.cursor.cy = ob.rowoff.min(last_row);
                 } else {
-                    ob.cursor.cy = ob.rowoff + text_rows - 1;
-                    if ob.cursor.cy > ob.buffer.num_rows() {
-                        ob.cursor.cy = ob.buffer.num_rows();
-                    }
+                    ob.cursor.cy = (ob.rowoff + text_rows.saturating_sub(1)).min(last_row);
                 }
 
                 let dir = if c == terminal::PAGE_UP {
@@ -1318,7 +1570,10 @@ impl Editor {
                 }
             }
 
-            terminal::ARROW_UP | terminal::ARROW_DOWN | terminal::ARROW_LEFT | terminal::ARROW_RIGHT => {
+            terminal::ARROW_UP
+            | terminal::ARROW_DOWN
+            | terminal::ARROW_LEFT
+            | terminal::ARROW_RIGHT => {
                 self.move_cursor(c, false);
             }
 

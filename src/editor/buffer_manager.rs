@@ -72,7 +72,6 @@ impl BufferManager {
 
     pub fn open_file(&mut self, filename: &str, syntax_db: &[Syntax]) -> usize {
         let reuse_first = self.buffers.len() == 1
-            && self.buffers[0].buffer.num_rows() == 0
             && self.buffers[0].buffer.filename().is_none()
             && !self.buffers[0].buffer.dirty();
 
@@ -84,7 +83,9 @@ impl BufferManager {
         };
 
         file_io::open_file(&mut self.buffers[idx].buffer, filename);
-        let syntax_idx = syntax_db.iter().position(|s| crate::syntax::matches(s, filename));
+        let syntax_idx = syntax_db
+            .iter()
+            .position(|s| crate::syntax::matches(s, filename));
         self.buffers[idx].active_syntax_idx = syntax_idx;
 
         if let Some(sidx) = syntax_idx {

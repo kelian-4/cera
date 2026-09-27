@@ -14,7 +14,7 @@ pub struct Buffer {
 impl Buffer {
     pub fn new() -> Self {
         Buffer {
-            rows: Vec::new(),
+            rows: vec![Row::new("")],
             filename: None,
             dirty: 0,
         }
@@ -123,7 +123,11 @@ impl Buffer {
     }
 
     pub fn set_lines(&mut self, lines: &[String]) {
-        self.rows = lines.iter().map(|l| Row::new(l.as_str())).collect();
+        if lines.is_empty() {
+            self.rows = vec![Row::new("")];
+        } else {
+            self.rows = lines.iter().map(|l| Row::new(l.as_str())).collect();
+        }
         self.reindex(0);
         self.dirty = 0;
     }
@@ -162,7 +166,7 @@ mod tests {
     #[test]
     fn test_insert_newline_splits_row() {
         let mut buf = Buffer::new();
-        buf.insert_row(0, "helloworld");
+        buf.set_lines(&["helloworld".to_string()]);
         buf.insert_newline(0, 5);
 
         assert_eq!(buf.num_rows(), 2);
@@ -173,8 +177,7 @@ mod tests {
     #[test]
     fn test_delete_char_merges_rows() {
         let mut buf = Buffer::new();
-        buf.insert_row(0, "hello");
-        buf.insert_row(1, "world");
+        buf.set_lines(&["hello".to_string(), "world".to_string()]);
 
         let pos = buf.delete_char(1, 0);
         assert_eq!(buf.num_rows(), 1);
@@ -186,8 +189,7 @@ mod tests {
     #[test]
     fn test_to_string_content() {
         let mut buf = Buffer::new();
-        buf.insert_row(0, "line1");
-        buf.insert_row(1, "line2");
+        buf.set_lines(&["line1".to_string(), "line2".to_string()]);
         assert_eq!(buf.to_string_content(), "line1\nline2\n");
     }
 
@@ -199,5 +201,20 @@ mod tests {
         assert!(buf.dirty());
         buf.clear_dirty();
         assert!(!buf.dirty());
+    }
+
+    #[test]
+    fn test_new_buffer_has_one_empty_line() {
+        let buf = Buffer::new();
+        assert_eq!(buf.num_rows(), 1);
+        assert_eq!(buf.row(0).chars(), "");
+    }
+
+    #[test]
+    fn test_set_lines_empty_still_has_one_line() {
+        let mut buf = Buffer::new();
+        buf.set_lines(&[]);
+        assert_eq!(buf.num_rows(), 1);
+        assert_eq!(buf.row(0).chars(), "");
     }
 }

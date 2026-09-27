@@ -2,7 +2,7 @@ use crate::editor::buffer_manager::BufferManager;
 use crate::io::config::Config;
 use crate::model::selection::Position;
 use crate::view::colors::{bg_sequence, fg_sequence, reset_fg_sequence};
-use crate::view::help_text::{full_documentation, short_help_line, MessageKind};
+use crate::view::help_text::{full_documentation, MessageKind};
 
 #[derive(Clone, Copy, Default)]
 pub struct SearchDisplayInfo {
@@ -21,10 +21,14 @@ pub struct ViewState<'a> {
     pub status_message_kind: MessageKind,
     pub status_message_age_seconds: i64,
     pub overlay_full_doc: bool,
-    pub show_help_bar: bool,
+    pub help_active: bool,
+    pub prompt_text: Option<String>,
+    pub prompt_cursor_offset: Option<usize>,
     pub search: SearchDisplayInfo,
     pub search_term: String,
+    pub search_cursor: usize,
     pub config: &'a Config,
+    pub i18n: &'a crate::i18n::Translations,
 }
 
 pub struct AppendBuffer {
@@ -33,7 +37,9 @@ pub struct AppendBuffer {
 
 impl AppendBuffer {
     pub fn new() -> Self {
-        AppendBuffer { data: String::new() }
+        AppendBuffer {
+            data: String::new(),
+        }
     }
 
     pub fn append(&mut self, s: &str) {
@@ -65,6 +71,42 @@ fn digit_count(n: usize) -> usize {
     }
 }
 
+/// Decoupe `text` en au plus 2 lignes d'au plus `width` caracteres chacune,
+/// en coupant sur une limite de mot (espace) quand c'est possible. Si un
+/// seul mot depasse `width`, il est coupe durement. Le texte au-dela de ce
+/// que 2 lignes de `width` peuvent contenir est tronque.
+pub fn wrap_message_two_lines(text: &str, width: usize) -> (String, Option<String>) {
+    if width == 0 {
+        return (String::new(), None);
+    }
+    let char_count = text.chars().count();
+    if char_count <= width {
+        return (text.to_string(), None);
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+
+    // Cherche la derniere limite de mot (espace) a l'interieur de `width`.
+    let mut split_at = width;
+    if let Some(last_space) = chars[..width].iter().rposition(|&c| c == ' ') {
+        if last_space > 0 {
+            split_at = last_space;
+        }
+    }
+
+    let first_line: String = chars[..split_at].iter().collect();
+    let mut rest_start = split_at;
+    while rest_start < chars.len() && chars[rest_start] == ' ' {
+        rest_start += 1;
+    }
+
+    let remaining = &chars[rest_start..];
+    let second_len = remaining.len().min(width);
+    let second_line: String = remaining[..second_len].iter().collect();
+
+    (first_line, Some(second_line))
+}
+
 pub fn gutter_width(state: &ViewState) -> usize {
     if !state.config.show_line_numbers {
         return 0;
@@ -74,14 +116,46 @@ pub fn gutter_width(state: &ViewState) -> usize {
 }
 
 pub fn text_area_screen_rows(state: &ViewState) -> usize {
-    let mut reserved = 2usize;
+    let mut reserved = status_bar_rows(state) + message_bar_rows(state);
     if state.buffer_manager.count() > 1 {
         reserved += 1;
     }
-    if state.show_help_bar {
-        reserved += 1;
+    if state.help_active {
+        reserved += 2;
     }
     state.screenrows.saturating_sub(reserved).max(1)
+}
+
+/// Nombre de lignes que prendra la barre de statut (prompt ou barre normale).
+/// La barre de statut normale tient toujours sur 1 ligne (contenu structure,
+/// jamais coupe). Seul un `prompt_text` long peut necessiter 2 lignes.
+fn status_bar_rows(state: &ViewState) -> usize {
+    match &state.prompt_text {
+        Some(prompt_text) => {
+            let line = format!(" {}", prompt_text);
+            let (_, second) = wrap_message_two_lines(&line, state.screencols);
+            if second.is_some() {
+                2
+            } else {
+                1
+            }
+        }
+        None => 1,
+    }
+}
+
+/// Nombre de lignes que prendra la barre de message (succes/erreur), 0 si
+/// aucun message n'est actuellement affiche.
+fn message_bar_rows(state: &ViewState) -> usize {
+    if state.status_message.is_empty() || state.status_message_age_seconds >= 5 {
+        return 1;
+    }
+    let (_, second) = wrap_message_two_lines(&state.status_message, state.screencols);
+    if second.is_some() {
+        2
+    } else {
+        1
+    }
 }
 
 fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
@@ -92,11 +166,7 @@ fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let mut line = String::new();
     for i in 0..state.buffer_manager.count() {
         let ob = state.buffer_manager.at(i);
-        let mut name = ob
-            .buffer
-            .filename()
-            .unwrap_or("[Sans nom]")
-            .to_string();
+        let mut name = ob.buffer.filename().unwrap_or("[Sans nom]").to_string();
         if let Some(pos) = name.rfind('/') {
             name = name[pos + 1..].to_string();
         }
@@ -159,20 +229,16 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
         }
 
         if filerow >= buffer.num_rows() {
-            if buffer.num_rows() == 0 && y == text_rows / 3 {
-                let welcome = "Cera editor -- version 0.1.0";
+            let is_single_empty_line = buffer.num_rows() == 1 && buffer.row(0).chars().is_empty();
+            if is_single_empty_line && y == text_rows / 3 {
+                let welcome = state.i18n.t("ui.welcome_message");
                 let welcome_len = welcome.chars().count().min(text_cols);
                 let welcome: String = welcome.chars().take(welcome_len).collect();
                 let padding = (text_cols.saturating_sub(welcome_len)) / 2;
-                if padding > 0 {
-                    ab.append("~");
-                    for _ in 0..padding.saturating_sub(1) {
-                        ab.append(" ");
-                    }
+                for _ in 0..padding {
+                    ab.append(" ");
                 }
                 ab.append(&welcome);
-            } else {
-                ab.append("~");
             }
         } else {
             let row = buffer.row(filerow);
@@ -223,7 +289,10 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
                         ab.append(&fg_sequence(rgb, true_color));
                     }
                 } else {
-                    let h = hl.get(ci).copied().unwrap_or(crate::model::row::Highlight::Normal);
+                    let h = hl
+                        .get(ci)
+                        .copied()
+                        .unwrap_or(crate::model::row::Highlight::Normal);
                     let rgb = crate::view::colors::highlight_to_rgb(h, theme);
                     if current_color_rgb != Some(rgb) {
                         current_color_rgb = Some(rgb);
@@ -247,35 +316,288 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
     }
 }
 
+fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
+    if !state.help_active {
+        return;
+    }
+
+    let entries = crate::view::help_text::short_help_entries(state.i18n);
+    let min_gap = 2usize;
+
+    // Largeur naturelle de chaque paire empilee (haut, bas), sans jamais
+    // tronquer le texte : c'est le plus long des deux libelles de la
+    // colonne.
+    let pairs: Vec<(
+        &crate::view::help_text::ShortHelpEntry,
+        Option<&crate::view::help_text::ShortHelpEntry>,
+    )> = entries.chunks(2).map(|c| (&c[0], c.get(1))).collect();
+
+    let natural_widths: Vec<usize> = pairs
+        .iter()
+        .map(|(top, bottom)| {
+            let top_len = format!("{} {}", top.key, top.label).chars().count();
+            let bottom_len = bottom
+                .map(|e| format!("{} {}", e.key, e.label).chars().count())
+                .unwrap_or(0);
+            top_len.max(bottom_len)
+        })
+        .collect();
+
+    // On ajoute des colonnes tant qu'elles rentrent entierement (largeur
+    // naturelle + marge minimale entre colonnes), sans jamais tronquer un
+    // libelle : si une colonne ne rentre plus, on s'arrete la plutot que
+    // de couper son texte.
+    let mut num_columns = 0usize;
+    let mut used = 0usize;
+    for (i, &w) in natural_widths.iter().enumerate() {
+        let extra = if i == 0 { w } else { min_gap + w };
+        if used + extra > state.screencols {
+            break;
+        }
+        used += extra;
+        num_columns = i + 1;
+    }
+    let num_columns = num_columns.max(1);
+
+    let top_cells: Vec<String> = pairs
+        .iter()
+        .take(num_columns)
+        .map(|(top, _)| format!("{} {}", top.key, top.label))
+        .collect();
+    let bottom_cells: Vec<String> = pairs
+        .iter()
+        .take(num_columns)
+        .map(|(_, bottom)| {
+            bottom
+                .map(|e| format!("{} {}", e.key, e.label))
+                .unwrap_or_default()
+        })
+        .collect();
+    let column_widths: Vec<usize> = natural_widths.into_iter().take(num_columns).collect();
+
+    draw_help_grid_line(ab, state.screencols, &top_cells, &column_widths);
+    draw_help_grid_line(ab, state.screencols, &bottom_cells, &column_widths);
+}
+
+/// Dessine une ligne du bandeau d'aide avec des colonnes de largeur fixe
+/// (`column_widths`), identiques sur les deux lignes du bandeau, pour que
+/// chaque colonne s'aligne verticalement lettre pour lettre. L'espace
+/// restant est reparti en marges egales entre les colonnes (bords colles
+/// aux marges, comme le format justifie existant).
+fn draw_help_grid_line(
+    ab: &mut AppendBuffer,
+    width: usize,
+    cells: &[String],
+    column_widths: &[usize],
+) {
+    if cells.is_empty() {
+        for _ in 0..width {
+            ab.append(" ");
+        }
+        ab.append("\r\n");
+        return;
+    }
+
+    let total_text_len: usize = column_widths.iter().sum();
+
+    if cells.len() == 1 {
+        let cell = &cells[0];
+        let cell_len = cell.chars().count();
+        ab.append(cell);
+        for _ in cell_len..width {
+            ab.append(" ");
+        }
+        ab.append("\r\n");
+        return;
+    }
+
+    let gaps = cells.len() - 1;
+    let available_space = width.saturating_sub(total_text_len);
+    let base_gap = available_space / gaps;
+    let extra = available_space % gaps;
+
+    let mut written = 0usize;
+    for (i, cell) in cells.iter().enumerate() {
+        if written >= width {
+            break;
+        }
+        let col_width = column_widths[i];
+        let cell_len = cell.chars().count().min(width - written);
+        let cell_trunc: String = cell.chars().take(cell_len).collect();
+        ab.append(&cell_trunc);
+        written += cell_len;
+
+        // Complete jusqu'a la largeur de la colonne pour que la colonne
+        // suivante demarre au meme endroit sur les deux lignes.
+        let pad_to_col = col_width
+            .saturating_sub(cell_len)
+            .min(width.saturating_sub(written));
+        for _ in 0..pad_to_col {
+            ab.append(" ");
+        }
+        written += pad_to_col;
+
+        if i < gaps {
+            let mut gap = base_gap;
+            if i < extra {
+                gap += 1;
+            }
+            gap = gap.min(width.saturating_sub(written));
+            for _ in 0..gap {
+                ab.append(" ");
+            }
+            written += gap;
+        }
+    }
+
+    for _ in written..width {
+        ab.append(" ");
+    }
+    ab.append("\r\n");
+}
+
+/// Ecrit `text` caractere par caractere, en affichant le caractere a
+/// `cursor_offset` (index 0-indexe dans `text`) en video inversee pour
+/// simuler un curseur de saisie "custom", distinct du curseur reel du
+/// terminal qui reste sur le document pendant la saisie. Si `cursor_offset`
+/// pointe juste apres le dernier caractere (fin de saisie), un espace
+/// inverse est ajoute pour representer le curseur, sauf si `text` occupe
+/// deja toute la largeur disponible (`max_width`), auquel cas le dernier
+/// caractere existant est inverse a la place pour ne jamais depasser la
+/// largeur du terminal.
+fn append_with_custom_cursor(
+    ab: &mut AppendBuffer,
+    text: &str,
+    cursor_offset: Option<usize>,
+    max_width: usize,
+) -> usize {
+    let chars: Vec<char> = text.chars().collect();
+    let at_end_but_full = matches!(cursor_offset, Some(o) if o >= chars.len())
+        && chars.len() >= max_width
+        && !chars.is_empty();
+
+    let effective_offset = if at_end_but_full {
+        Some(chars.len() - 1)
+    } else {
+        cursor_offset
+    };
+
+    match effective_offset {
+        None => {
+            ab.append(text);
+            chars.len()
+        }
+        Some(offset) if offset < chars.len() => {
+            let before: String = chars[..offset].iter().collect();
+            let cursor_char = chars[offset];
+            let after: String = chars[offset + 1..].iter().collect();
+            ab.append(&before);
+            ab.append("\x1b[7m");
+            ab.append(&cursor_char.to_string());
+            ab.append("\x1b[27m");
+            ab.append(&after);
+            chars.len()
+        }
+        Some(_) => {
+            // Le curseur est juste apres le dernier caractere tape.
+            ab.append(text);
+            ab.append("\x1b[7m \x1b[27m");
+            chars.len() + 1
+        }
+    }
+}
+
+/// Dessine la barre de statut. Le curseur reel du terminal reste toujours
+/// sur le document ; un curseur custom (video inversee) est dessine
+/// directement dans le texte pour indiquer la position de saisie pendant
+/// un prompt ou une recherche.
 fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
+    if let Some(prompt_text) = &state.prompt_text {
+        let line = format!(" {}", prompt_text);
+        let (first, second) = wrap_message_two_lines(&line, state.screencols);
+
+        // Le curseur logique se trouve a `1 + offset` dans `line` (le " "
+        // ajoute en prefixe compte pour 1). On localise sur quelle ligne
+        // affichee (avant/apres le wrap) il tombe.
+        let first_len = first.chars().count();
+        let line_total = line.chars().count();
+        let mut first_cursor = None;
+        let mut second_cursor = None;
+        if let Some(offset) = state.prompt_cursor_offset {
+            let target = (1 + offset).min(line_total);
+            if target <= first_len {
+                first_cursor = Some(target);
+            } else if second.is_some() {
+                second_cursor = Some(target - first_len);
+            } else {
+                first_cursor = Some(first_len);
+            }
+        }
+
+        let written = append_with_custom_cursor(ab, &first, first_cursor, state.screencols);
+        for _ in written..state.screencols {
+            ab.append(" ");
+        }
+        ab.append("\r\n");
+
+        if let Some(second) = second {
+            let written2 = append_with_custom_cursor(ab, &second, second_cursor, state.screencols);
+            for _ in written2..state.screencols {
+                ab.append(" ");
+            }
+            ab.append("\r\n");
+        }
+        return;
+    }
+
     let ob = state.buffer_manager.active();
     let buffer = &ob.buffer;
 
+    let search_prefix = format!(" {}", state.i18n.t("search.prefix"));
     let left = if state.search.active {
         format!(
-            " recherche: {} ({}/{})",
-            state.search_term, state.search.current_index, state.search.total_matches
+            "{}{} ({}/{})",
+            search_prefix,
+            state.search_term,
+            state.search.current_index,
+            state.search.total_matches
         )
     } else {
-        " ^H aide".to_string()
+        format!(" {}", state.i18n.t("help.toggle_hint"))
     };
 
-    let mut filename = buffer.filename().unwrap_or("[Sans nom]").to_string();
+    let no_name = state.i18n.t("doc.no_filename");
+    let mut filename = buffer.filename().unwrap_or(&no_name).to_string();
     if let Some(pos) = filename.rfind('/') {
         filename = filename[pos + 1..].to_string();
     }
     let mut center = filename;
     if buffer.dirty() {
-        center.push_str(" [modifie]");
+        center.push(' ');
+        center.push_str(&state.i18n.t("doc.modified_suffix"));
     }
 
     let total_lines = buffer.num_rows().max(1);
-    let right = format!("{}/{} ", ob.cursor.cy + 1, total_lines);
+    let percent = ((ob.cursor.cy + 1) * 100) / total_lines;
+    let bar_width = 10usize;
+    let filled = (percent * bar_width) / 100;
+    let mut bar = String::with_capacity(bar_width);
+    for i in 0..bar_width {
+        bar.push(if i < filled { '█' } else { '░' });
+    }
+    let right = format!("{} {}/{} ", bar, ob.cursor.cy + 1, total_lines);
 
     let total = state.screencols;
     let left_len = left.chars().count().min(total);
     let left_trunc: String = left.chars().take(left_len).collect();
-    ab.append(&left_trunc);
+
+    let left_cursor = if state.search.active {
+        let prefix_len = search_prefix.chars().count();
+        Some((prefix_len + state.search_cursor).min(left_len))
+    } else {
+        None
+    };
+    append_with_custom_cursor(ab, &left_trunc, left_cursor, left_len);
 
     let right_len = right.chars().count();
     let center_len = center.chars().count();
@@ -313,34 +635,27 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\r\n");
 }
 
-fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
-    if !state.show_help_bar {
-        return;
-    }
-
-    let help = format!(" {}", short_help_line());
-    let help_len = help.chars().count().min(state.screencols);
-    let help_trunc: String = help.chars().take(help_len).collect();
-    ab.append(&help_trunc);
-    for _ in help_len..state.screencols {
-        ab.append(" ");
-    }
-    ab.append("\r\n");
-}
-
 fn draw_message_bar(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\x1b[K");
-    let msg_len = state.status_message.chars().count().min(state.screencols);
-    if msg_len > 0 && state.status_message_age_seconds < 5 {
+    if !state.status_message.is_empty() && state.status_message_age_seconds < 5 {
         let color = match state.status_message_kind {
             MessageKind::Success => state.config.theme.success_fg,
             MessageKind::Error => state.config.theme.error_fg,
             MessageKind::Info => state.config.theme.normal,
         };
+        let (first, second) = wrap_message_two_lines(&state.status_message, state.screencols);
+
         ab.append(&fg_sequence(color, state.config.true_color));
-        let msg_trunc: String = state.status_message.chars().take(msg_len).collect();
-        ab.append(&msg_trunc);
+        ab.append(&first);
         ab.append(reset_fg_sequence());
+
+        if let Some(second) = second {
+            ab.append("\r\n");
+            ab.append("\x1b[K");
+            ab.append(&fg_sequence(color, state.config.true_color));
+            ab.append(&second);
+            ab.append(reset_fg_sequence());
+        }
     }
 }
 
@@ -349,7 +664,7 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     let true_color = state.config.true_color;
 
     ab.append(&fg_sequence(theme.keyword1, true_color));
-    let title = " Documentation de Cera -- Echap pour revenir au fichier ";
+    let title = state.i18n.t("doc.title");
     let title_len = title.chars().count().min(state.screencols);
     let title_trunc: String = title.chars().take(title_len).collect();
     ab.append(&title_trunc);
@@ -358,18 +673,18 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\r\n");
 
     let mut rows_used = 1usize;
-    for cat in full_documentation() {
+    for cat in full_documentation(state.i18n) {
         if rows_used >= state.screenrows.saturating_sub(1) {
             break;
         }
         ab.append(&fg_sequence(theme.keyword1, true_color));
-        ab.append(cat.name);
+        ab.append(&cat.name);
         ab.append(reset_fg_sequence());
         ab.append("\x1b[K");
         ab.append("\r\n");
         rows_used += 1;
 
-        for entry in cat.entries {
+        for entry in &cat.entries {
             if rows_used >= state.screenrows.saturating_sub(1) {
                 break;
             }
@@ -418,8 +733,16 @@ pub fn refresh(state: &ViewState) -> String {
 
     let ob = state.buffer_manager.active();
     let gutter = gutter_width(state);
-    let tab_bar_height = if state.buffer_manager.count() > 1 { 1 } else { 0 };
+    let tab_bar_height = if state.buffer_manager.count() > 1 {
+        1
+    } else {
+        0
+    };
 
+    // Le curseur reel du terminal reste toujours sur le document, meme
+    // pendant un prompt ou une recherche : la position de saisie est
+    // indiquee separement par un curseur custom (video inversee) dessine
+    // dans draw_status_bar, pour qu'on voie les deux a la fois.
     let cursor_row = tab_bar_height + (ob.cursor.cy.saturating_sub(state.rowoff)) + 1;
     let cursor_col = gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;
     ab.append(&format!("\x1b[{};{}H", cursor_row, cursor_col));
@@ -427,4 +750,80 @@ pub fn refresh(state: &ViewState) -> String {
     ab.append("\x1b[?25h");
 
     ab.data().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrap_message_fits_on_one_line() {
+        let (first, second) = wrap_message_two_lines("short message", 40);
+        assert_eq!(first, "short message");
+        assert_eq!(second, None);
+    }
+
+    #[test]
+    fn test_wrap_message_breaks_on_word_boundary() {
+        let text = "Remplacer \"X\" ? (o)ui / (n)on / (t)out / Echap pour arreter";
+        let (first, second) = wrap_message_two_lines(text, 30);
+        assert!(first.chars().count() <= 30);
+        assert!(!first.ends_with(' '));
+        let second = second.expect("le message devrait se couper sur 2 lignes");
+        assert!(second.chars().count() <= 30);
+        // Aucune coupure au milieu d'un mot : la premiere ligne se termine
+        // par un mot complet, la deuxieme reprend au mot suivant.
+        assert_eq!(first, "Remplacer \"X\" ? (o)ui / (n)on");
+        assert_eq!(second, "/ (t)out / Echap pour arreter");
+    }
+
+    #[test]
+    fn test_wrap_message_hard_breaks_long_word() {
+        let text = "supercalifragilisticexpialidocious";
+        let (first, second) = wrap_message_two_lines(text, 10);
+        assert_eq!(first.chars().count(), 10);
+        let second = second.expect("un mot plus long que la largeur doit etre coupe");
+        assert_eq!(second.chars().count(), 10);
+    }
+
+    #[test]
+    fn test_wrap_message_zero_width() {
+        let (first, second) = wrap_message_two_lines("abc", 0);
+        assert_eq!(first, "");
+        assert_eq!(second, None);
+    }
+
+    #[test]
+    fn test_custom_cursor_in_middle_of_text() {
+        let mut ab = AppendBuffer::new();
+        let written = append_with_custom_cursor(&mut ab, "hello", Some(2), 20);
+        assert_eq!(written, 5);
+        assert_eq!(ab.data(), "he\x1b[7ml\x1b[27mlo");
+    }
+
+    #[test]
+    fn test_custom_cursor_at_end_with_room() {
+        let mut ab = AppendBuffer::new();
+        let written = append_with_custom_cursor(&mut ab, "hi", Some(2), 20);
+        assert_eq!(written, 3);
+        assert_eq!(ab.data(), "hi\x1b[7m \x1b[27m");
+    }
+
+    #[test]
+    fn test_custom_cursor_at_end_when_line_is_full() {
+        let mut ab = AppendBuffer::new();
+        // "hi" occupe deja toute la largeur disponible (2) : pas de place
+        // pour ajouter un espace-curseur, on inverse le dernier caractere.
+        let written = append_with_custom_cursor(&mut ab, "hi", Some(2), 2);
+        assert_eq!(written, 2);
+        assert_eq!(ab.data(), "h\x1b[7mi\x1b[27m");
+    }
+
+    #[test]
+    fn test_no_cursor_leaves_text_untouched() {
+        let mut ab = AppendBuffer::new();
+        let written = append_with_custom_cursor(&mut ab, "hello", None, 20);
+        assert_eq!(written, 5);
+        assert_eq!(ab.data(), "hello");
+    }
 }

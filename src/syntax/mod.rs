@@ -1,7 +1,27 @@
 pub mod c_syntax;
-pub mod python_syntax;
+pub mod cpp_syntax;
+pub mod csharp_syntax;
+pub mod css_syntax;
+pub mod go_syntax;
+pub mod haskell_syntax;
+pub mod html_syntax;
+pub mod java_syntax;
 pub mod javascript_syntax;
+pub mod json_syntax;
+pub mod kotlin_syntax;
+pub mod lua_syntax;
 pub mod markdown_syntax;
+pub mod perl_syntax;
+pub mod php_syntax;
+pub mod python_syntax;
+pub mod r_syntax;
+pub mod ruby_syntax;
+pub mod rust_syntax;
+pub mod shell_syntax;
+pub mod sql_syntax;
+pub mod swift_syntax;
+pub mod yaml_syntax;
+pub mod zig_syntax;
 
 use crate::model::buffer::Buffer;
 use crate::model::row::Highlight;
@@ -42,7 +62,7 @@ pub fn matches(syntax: &Syntax, filename: &str) -> bool {
 }
 
 fn is_separator(c: char) -> bool {
-    c.is_whitespace() || c == '\0' || ",.()+-/*=~%<>[];".contains(c)
+    c.is_whitespace() || c == '\0' || ",.()+-/*=~%<>[]{};:!&|".contains(c)
 }
 
 fn is_keyword2(kw: &str) -> bool {
@@ -208,18 +228,35 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
     }
 }
 
-pub fn select_for_filename<'a>(
-    database: &'a [Syntax],
-    filename: &str,
-) -> Option<&'a Syntax> {
+pub fn select_for_filename<'a>(database: &'a [Syntax], filename: &str) -> Option<&'a Syntax> {
     database.iter().find(|s| matches(s, filename))
 }
 
 pub fn build_database() -> Vec<Syntax> {
     vec![
         c_syntax::c_syntax(),
+        cpp_syntax::cpp_syntax(),
         python_syntax::python_syntax(),
         javascript_syntax::javascript_syntax(),
+        rust_syntax::rust_syntax(),
+        go_syntax::go_syntax(),
+        java_syntax::java_syntax(),
+        csharp_syntax::csharp_syntax(),
+        ruby_syntax::ruby_syntax(),
+        php_syntax::php_syntax(),
+        swift_syntax::swift_syntax(),
+        kotlin_syntax::kotlin_syntax(),
+        shell_syntax::shell_syntax(),
+        sql_syntax::sql_syntax(),
+        yaml_syntax::yaml_syntax(),
+        json_syntax::json_syntax(),
+        lua_syntax::lua_syntax(),
+        perl_syntax::perl_syntax(),
+        haskell_syntax::haskell_syntax(),
+        r_syntax::r_syntax(),
+        zig_syntax::zig_syntax(),
+        html_syntax::html_syntax(),
+        css_syntax::css_syntax(),
         markdown_syntax::markdown_syntax(),
     ]
 }
@@ -231,9 +268,13 @@ mod tests {
     #[test]
     fn test_syntax_selection() {
         let db = build_database();
-        let c = select_for_filename(&db, "main.cpp");
+        let c = select_for_filename(&db, "main.c");
         assert!(c.is_some());
         assert_eq!(c.unwrap().filetype, "c");
+
+        let cpp = select_for_filename(&db, "main.cpp");
+        assert!(cpp.is_some());
+        assert_eq!(cpp.unwrap().filetype, "cpp");
 
         let py = select_for_filename(&db, "script.py");
         assert!(py.is_some());
@@ -242,6 +283,14 @@ mod tests {
         let js = select_for_filename(&db, "app.ts");
         assert!(js.is_some());
         assert_eq!(js.unwrap().filetype, "javascript");
+
+        let rust = select_for_filename(&db, "main.rs");
+        assert!(rust.is_some());
+        assert_eq!(rust.unwrap().filetype, "rust");
+
+        let go = select_for_filename(&db, "main.go");
+        assert!(go.is_some());
+        assert_eq!(go.unwrap().filetype, "go");
 
         let none = select_for_filename(&db, "data.xyz");
         assert!(none.is_none());

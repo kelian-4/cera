@@ -72,7 +72,8 @@ mod tests {
         let mut buf = Buffer::new();
         open_file(&mut buf, "/tmp/cera_rust_definitely_does_not_exist.txt");
 
-        assert_eq!(buf.num_rows(), 0);
+        assert_eq!(buf.num_rows(), 1);
+        assert_eq!(buf.row(0).chars(), "");
         assert!(!buf.dirty());
         assert_eq!(
             buf.filename(),
@@ -87,8 +88,7 @@ mod tests {
 
         let mut buf = Buffer::new();
         buf.set_filename(path);
-        buf.insert_row(0, "hello");
-        buf.insert_row(1, "world");
+        buf.set_lines(&["hello".to_string(), "world".to_string()]);
 
         save_file(&mut buf).unwrap();
 

@@ -20,22 +20,22 @@ pub struct ThemeColors {
 impl Default for ThemeColors {
     fn default() -> Self {
         ThemeColors {
-            normal: 0xD8DEE9,
-            comment: 0x616E88,
-            keyword1: 0x81A1C1,
-            keyword2: 0xA3BE8C,
-            string_color: 0xEBCB8B,
-            number: 0xB48EAD,
-            match_color: 0xFFFF00,
-            line_number_fg: 0x4C566A,
-            error_fg: 0xBF616A,
-            success_fg: 0xA3BE8C,
-            selection_bg: 0x434C5E,
+            normal: 0xE8EDF2,
+            comment: 0x8FA3B8,
+            keyword1: 0x82C0FF,
+            keyword2: 0x8CF5D6,
+            string_color: 0xA8E6CF,
+            number: 0xC9A8FF,
+            match_color: 0xFFFF66,
+            line_number_fg: 0x7BA3C9,
+            error_fg: 0xFF8A8A,
+            success_fg: 0x9CE89C,
+            selection_bg: 0x3A4A5A,
         }
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Config {
     pub tab_stop: usize,
     pub quit_times: i32,
@@ -43,17 +43,21 @@ pub struct Config {
     pub show_line_numbers: bool,
     pub mouse_enabled: bool,
     pub theme: ThemeColors,
+    /// Code de langue force par l'utilisateur (ex: "fr", "en", "es"). Si
+    /// absent, la langue du systeme (LANG/LC_ALL) est utilisee.
+    pub language: Option<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             tab_stop: 8,
-            quit_times: 3,
+            quit_times: 1,
             true_color: true,
             show_line_numbers: true,
             mouse_enabled: true,
             theme: ThemeColors::default(),
+            language: None,
         }
     }
 }
@@ -85,7 +89,54 @@ pub fn default_config_path() -> String {
             return format!("{}/.config/cera/config.json", home);
         }
     }
-    ".cera.json".to_string()
+    "config.json".to_string()
+}
+
+/// Le contenu JSON par defaut ecrit lors de la premiere generation du
+/// fichier de configuration. Reflete exactement les valeurs par defaut de
+/// `Config::default()` / `ThemeColors::default()`, formate lisiblement
+/// pour qu'il soit facile a comprendre et modifier a la main.
+fn default_config_json() -> String {
+    r##"{
+  "tab_stop": 8,
+  "quit_times": 1,
+  "true_color": true,
+  "show_line_numbers": true,
+  "mouse_enabled": true,
+  "language": null,
+  "theme": {
+    "normal": "#E8EDF2",
+    "comment": "#8FA3B8",
+    "keyword1": "#82C0FF",
+    "keyword2": "#8CF5D6",
+    "string": "#A8E6CF",
+    "number": "#C9A8FF",
+    "match": "#FFFF66",
+    "line_number_fg": "#7BA3C9",
+    "error_fg": "#FF8A8A",
+    "success_fg": "#9CE89C"
+  }
+}
+"##
+    .to_string()
+}
+
+/// Cree le fichier de configuration avec les valeurs par defaut s'il
+/// n'existe pas deja (creant aussi le dossier parent si besoin). N'ecrase
+/// jamais un fichier existant. Les erreurs d'ecriture sont ignorees
+/// silencieusement : l'editeur doit pouvoir demarrer meme sans pouvoir
+/// creer ce fichier (dossier en lecture seule, etc.), en utilisant les
+/// valeurs par defaut en memoire.
+pub fn ensure_config_file_exists(path: &str) {
+    if fs::metadata(path).is_ok() {
+        return;
+    }
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        if !parent.as_os_str().is_empty() {
+            let _ = fs::create_dir_all(parent);
+        }
+    }
+    let _ = fs::write(path, default_config_json());
 }
 
 pub fn load_from_file(path: &str) -> (Config, bool) {
@@ -127,6 +178,14 @@ pub fn load_from_file(path: &str) -> (Config, bool) {
             cfg.mouse_enabled = v.as_bool(cfg.mouse_enabled);
         }
     }
+    if let Some(v) = root.get("language") {
+        if v.is_string() {
+            let s = v.as_string("");
+            if !s.is_empty() {
+                cfg.language = Some(s);
+            }
+        }
+    }
 
     if let Some(theme) = root.get("theme") {
         if theme.is_object() {
@@ -156,7 +215,7 @@ mod tests {
         let (cfg, loaded) = load_from_file("/nonexistent/path/config.json");
         assert!(!loaded);
         assert_eq!(cfg.tab_stop, 8);
-        assert_eq!(cfg.quit_times, 3);
+        assert_eq!(cfg.quit_times, 1);
     }
 
     #[test]
@@ -175,6 +234,55 @@ mod tests {
         assert_eq!(cfg.quit_times, 1);
         assert!(!cfg.true_color);
         assert_eq!(cfg.theme.keyword1, 0xff0000);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_default_config_path_ends_with_config_json() {
+        let path = default_config_path();
+        assert!(
+            path.ends_with("config.json"),
+            "le fichier de config doit s'appeler config.json, obtenu: {}",
+            path
+        );
+    }
+
+    #[test]
+    fn test_ensure_config_file_exists_creates_file_with_parent_dir() {
+        let dir = "/tmp/cera_rust_test_ensure_config_dir";
+        let path = format!("{}/config.json", dir);
+        let _ = fs::remove_dir_all(dir);
+
+        assert!(fs::metadata(&path).is_err());
+        ensure_config_file_exists(&path);
+        assert!(fs::metadata(&path).is_ok());
+
+        // Le fichier genere doit etre un JSON valide, rechargeable, et
+        // correspondre aux valeurs par defaut.
+        let (cfg, loaded) = load_from_file(&path);
+        assert!(loaded);
+        assert_eq!(cfg.tab_stop, 8);
+        assert_eq!(cfg.quit_times, 1);
+        assert!(cfg.true_color);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_ensure_config_file_exists_never_overwrites_existing_file() {
+        let path = "/tmp/cera_rust_test_ensure_no_overwrite.json";
+        let mut f = fs::File::create(path).unwrap();
+        writeln!(f, r##"{{"tab_stop": 2}}"##).unwrap();
+        drop(f);
+
+        ensure_config_file_exists(path);
+
+        let (cfg, _) = load_from_file(path);
+        assert_eq!(
+            cfg.tab_stop, 2,
+            "un fichier existant ne doit jamais etre ecrase"
+        );
 
         let _ = fs::remove_file(path);
     }

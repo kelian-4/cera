@@ -68,6 +68,24 @@ pub fn substr_by_char(s: &str, from_char_idx: usize, to_char_idx: usize) -> Stri
         .collect()
 }
 
+pub fn find_pattern(haystack: &str, needle: &str, from_byte: usize) -> Option<usize> {
+    if needle.is_empty() || from_byte > haystack.len() {
+        return None;
+    }
+    haystack
+        .get(from_byte..)
+        .and_then(|s| s.find(needle))
+        .map(|p| from_byte + p)
+}
+
+pub fn rfind_pattern_before(haystack: &str, needle: &str, before_byte: usize) -> Option<usize> {
+    if needle.is_empty() {
+        return None;
+    }
+    let limit = before_byte.min(haystack.len());
+    haystack.get(..limit).and_then(|s| s.rfind(needle))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +124,30 @@ mod tests {
         let s = "hello world";
         assert_eq!(substr_by_char(s, 0, 5), "hello");
         assert_eq!(substr_by_char(s, 6, 11), "world");
+    }
+
+    #[test]
+    fn test_find_pattern_matches_as_substring() {
+        let s = "monon non";
+        assert_eq!(find_pattern(s, "non", 0), Some(2));
+    }
+
+    #[test]
+    fn test_find_pattern_matches_inside_larger_word() {
+        assert_eq!(find_pattern("monon", "non", 0), Some(2));
+        assert_eq!(find_pattern("nonmono", "non", 0), Some(0));
+    }
+
+    #[test]
+    fn test_find_pattern_advances_from_offset() {
+        let s = "non monon non";
+        assert_eq!(find_pattern(s, "non", 1), Some(6));
+    }
+
+    #[test]
+    fn test_rfind_pattern_before() {
+        let s = "non monon non";
+        assert_eq!(rfind_pattern_before(s, "non", 13), Some(10));
+        assert_eq!(rfind_pattern_before(s, "non", 5), Some(0));
     }
 }

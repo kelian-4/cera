@@ -6,115 +6,92 @@ pub enum MessageKind {
 }
 
 pub struct HelpEntry {
-    pub shortcut: &'static str,
-    pub description: &'static str,
+    pub shortcut: String,
+    pub description: String,
 }
 
 pub struct HelpCategory {
-    pub name: &'static str,
-    pub entries: &'static [HelpEntry],
+    pub name: String,
+    pub entries: Vec<HelpEntry>,
 }
 
-pub fn short_help_line() -> &'static str {
-    "^H aide  ^S sauver  ^Q quitter  ^F chercher  ^R remplacer  ^Z annuler  ^Y retablir  ^K couper ligne"
+pub struct ShortHelpEntry {
+    pub key: String,
+    pub label: String,
 }
 
-pub fn full_documentation() -> &'static [HelpCategory] {
-    &[
+pub fn short_help_entries(i18n: &crate::i18n::Translations) -> Vec<ShortHelpEntry> {
+    let entry = |key: &str, label_key: &str| ShortHelpEntry {
+        key: key.to_string(),
+        label: i18n.t(label_key),
+    };
+    vec![
+        entry("^S", "help.save"),
+        entry("^Q", "help.quit"),
+        entry("^F", "help.find"),
+        entry("^R", "help.replace"),
+        entry("^Z", "help.undo"),
+        entry("^Y", "help.redo"),
+        entry("^X", "help.cut"),
+        entry("^C", "help.copy"),
+        entry("^V", "help.paste"),
+        entry("^K", "help.cut_line"),
+        entry("^L", "help.goto_line"),
+        entry("^N", "help.next_file"),
+        entry("^P", "help.prev_file"),
+        entry("^D", "help.docs"),
+    ]
+}
+
+pub fn full_documentation(i18n: &crate::i18n::Translations) -> Vec<HelpCategory> {
+    let entry = |shortcut: &str, desc_key: &str| HelpEntry {
+        shortcut: shortcut.to_string(),
+        description: i18n.t(desc_key),
+    };
+    vec![
         HelpCategory {
-            name: "Fichier",
-            entries: &[
+            name: i18n.t("doc.category.file"),
+            entries: vec![entry("Ctrl-S", "doc.save"), entry("Ctrl-Q", "doc.quit")],
+        },
+        HelpCategory {
+            name: i18n.t("doc.category.edit"),
+            entries: vec![
+                entry("Ctrl-Z", "doc.undo"),
+                entry("Ctrl-Y", "doc.redo"),
+                entry("Ctrl-X", "doc.cut"),
+                entry("Ctrl-C", "doc.copy"),
+                entry("Ctrl-V", "doc.paste"),
+                entry("Ctrl-K", "doc.cut_line"),
+            ],
+        },
+        HelpCategory {
+            name: i18n.t("doc.category.search"),
+            entries: vec![entry("Ctrl-F", "doc.find"), entry("Ctrl-R", "doc.replace")],
+        },
+        HelpCategory {
+            name: i18n.t("doc.category.navigation"),
+            entries: vec![
+                entry("Ctrl-L", "doc.goto_line"),
+                entry("Ctrl-N", "doc.next_file"),
+                entry("Ctrl-P", "doc.prev_file"),
                 HelpEntry {
-                    shortcut: "Ctrl-S",
-                    description: "Sauvegarder le fichier courant",
+                    shortcut: i18n.t("doc.arrows"),
+                    description: i18n.t("doc.arrows_desc"),
                 },
                 HelpEntry {
-                    shortcut: "Ctrl-Q",
-                    description: "Quitter Cera (confirmation si modifications non sauvegardees)",
+                    shortcut: i18n.t("doc.ctrl_arrow"),
+                    description: i18n.t("doc.ctrl_arrow_desc"),
                 },
             ],
         },
         HelpCategory {
-            name: "Edition",
-            entries: &[
+            name: i18n.t("doc.category.help"),
+            entries: vec![
+                entry("Ctrl-H", "doc.toggle_help"),
+                entry("Ctrl-D", "doc.full_docs"),
                 HelpEntry {
-                    shortcut: "Ctrl-Z",
-                    description: "Annuler la derniere action",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-Y",
-                    description: "Retablir l'action annulee",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-X",
-                    description: "Couper la selection vers le presse-papier",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-C",
-                    description: "Copier la selection vers le presse-papier",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-V",
-                    description: "Coller le contenu du presse-papier",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-K",
-                    description: "Couper la ligne entiere",
-                },
-            ],
-        },
-        HelpCategory {
-            name: "Recherche",
-            entries: &[
-                HelpEntry {
-                    shortcut: "Ctrl-F",
-                    description: "Rechercher (Entree pour l'occurrence suivante, Echap pour arreter)",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-R",
-                    description: "Rechercher-remplacer, avec confirmation par occurrence",
-                },
-            ],
-        },
-        HelpCategory {
-            name: "Navigation",
-            entries: &[
-                HelpEntry {
-                    shortcut: "Ctrl-L",
-                    description: "Aller a une ligne precise",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-N",
-                    description: "Passer au tampon suivant",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-P",
-                    description: "Passer au tampon precedent",
-                },
-                HelpEntry {
-                    shortcut: "Fleches",
-                    description: "Deplacer le curseur",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-Fleche",
-                    description: "Etendre la selection",
-                },
-            ],
-        },
-        HelpCategory {
-            name: "Aide",
-            entries: &[
-                HelpEntry {
-                    shortcut: "Ctrl-H",
-                    description: "Afficher/masquer le bandeau d'aide",
-                },
-                HelpEntry {
-                    shortcut: "Ctrl-D",
-                    description: "Afficher cette documentation complete",
-                },
-                HelpEntry {
-                    shortcut: "Echap",
-                    description: "Revenir a l'edition du fichier",
+                    shortcut: "Echap".to_string(),
+                    description: i18n.t("doc.escape"),
                 },
             ],
         },

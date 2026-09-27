@@ -4,7 +4,9 @@ use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
-use nix::sys::termios::{self, LocalFlags, InputFlags, OutputFlags, SetArg, SpecialCharacterIndices};
+use nix::sys::termios::{
+    self, InputFlags, LocalFlags, OutputFlags, SetArg, SpecialCharacterIndices,
+};
 
 pub const NO_KEY: i32 = -2;
 pub const BACKSPACE: i32 = 127;
@@ -63,8 +65,7 @@ pub struct Terminal {
 impl Terminal {
     pub fn new() -> io::Result<Self> {
         let stdin_fd = std::io::stdin();
-        let orig_termios = termios::tcgetattr(stdin_fd.as_fd())
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let orig_termios = termios::tcgetattr(stdin_fd.as_fd()).map_err(io::Error::other)?;
 
         let mut term = Terminal {
             orig_termios: orig_termios.clone(),
@@ -90,14 +91,12 @@ impl Terminal {
                 | InputFlags::IXON,
         );
         raw.output_flags.remove(OutputFlags::OPOST);
-        raw.local_flags.remove(
-            LocalFlags::ECHO | LocalFlags::ICANON | LocalFlags::IEXTEN | LocalFlags::ISIG,
-        );
+        raw.local_flags
+            .remove(LocalFlags::ECHO | LocalFlags::ICANON | LocalFlags::IEXTEN | LocalFlags::ISIG);
         raw.control_chars[SpecialCharacterIndices::VMIN as usize] = 0;
         raw.control_chars[SpecialCharacterIndices::VTIME as usize] = 1;
 
-        termios::tcsetattr(stdin_fd.as_fd(), SetArg::TCSAFLUSH, &raw)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        termios::tcsetattr(stdin_fd.as_fd(), SetArg::TCSAFLUSH, &raw).map_err(io::Error::other)?;
 
         self.raw_mode_enabled = true;
         Ok(())
@@ -122,6 +121,20 @@ impl Terminal {
 
     pub fn disable_mouse_reporting(&mut self) {
         self.write(b"\x1b[?1006l\x1b[?1002l");
+    }
+
+    /// Restaure completement l'etat du terminal avant de quitter le
+    /// programme : desactive le rapport souris, quitte l'ecran alternatif,
+    /// puis restaure le mode terminal d'origine (raw mode desactive).
+    /// A appeler explicitement avant tout `std::process::exit`, car
+    /// `process::exit` ne declenche jamais `Drop` : sans cet appel, le
+    /// terminal reste en mode rapport souris (la souris ne fonctionne
+    /// plus normalement dans le shell apres avoir quitte Cera) et en mode
+    /// raw.
+    pub fn shutdown(&mut self) {
+        self.disable_mouse_reporting();
+        self.write(b"\x1b[?1049l");
+        self.disable_raw_mode();
     }
 
     pub fn last_mouse_event(&self) -> MouseEvent {
@@ -359,9 +372,7 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        self.disable_mouse_reporting();
-        self.write(b"\x1b[?1049l");
-        self.disable_raw_mode();
+        self.shutdown();
     }
 }
 
