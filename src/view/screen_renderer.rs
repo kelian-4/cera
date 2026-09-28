@@ -29,6 +29,10 @@ pub struct ViewState<'a> {
     pub search_cursor: usize,
     pub config: &'a Config,
     pub i18n: &'a crate::i18n::Translations,
+    /// Si `Some`, une vue plugin est active et remplace entierement
+    /// l'affichage du buffer (tab bar, aide et barres de statut/message
+    /// compris) par ces lignes.
+    pub plugin_view: Option<&'a [crate::plugin::protocol::RenderLine]>,
 }
 
 pub struct AppendBuffer {
@@ -713,6 +717,50 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\x1b[K");
 }
 
+fn draw_plugin_view(
+    ab: &mut AppendBuffer,
+    state: &ViewState,
+    lines: &[crate::plugin::protocol::RenderLine],
+) {
+    let theme = &state.config.theme;
+    let true_color = state.config.true_color;
+    let mut rows_used = 0usize;
+
+    for line in lines {
+        if rows_used >= state.screenrows {
+            break;
+        }
+        let mut written = 0usize;
+        for segment in &line.segments {
+            if written >= state.screencols {
+                break;
+            }
+            let color = segment.color.unwrap_or(theme.normal);
+            ab.append(&fg_sequence(color, true_color));
+            if segment.bold {
+                ab.append("\x1b[1m");
+            }
+            let remaining = state.screencols - written;
+            let text_len = segment.text.chars().count().min(remaining);
+            let text_trunc: String = segment.text.chars().take(text_len).collect();
+            ab.append(&text_trunc);
+            if segment.bold {
+                ab.append("\x1b[22m");
+            }
+            ab.append(reset_fg_sequence());
+            written += text_len;
+        }
+        ab.append("\x1b[K");
+        ab.append("\r\n");
+        rows_used += 1;
+    }
+
+    for _ in rows_used..state.screenrows {
+        ab.append("\x1b[K");
+        ab.append("\r\n");
+    }
+}
+
 pub fn refresh(state: &ViewState) -> String {
     let mut ab = AppendBuffer::new();
 
@@ -722,6 +770,12 @@ pub fn refresh(state: &ViewState) -> String {
     if state.overlay_full_doc {
         draw_full_doc(&mut ab, state);
         ab.append("\x1b[?25h");
+        return ab.data().to_string();
+    }
+
+    if let Some(lines) = state.plugin_view {
+        draw_plugin_view(&mut ab, state, lines);
+        ab.append("\x1b[?25l");
         return ab.data().to_string();
     }
 

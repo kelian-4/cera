@@ -74,6 +74,9 @@
   "status.clipboard_empty": "Presse-papier vide",
   "status.pasted": "Colle",
   "status.confirm_quit_unsaved": "Modifications non sauvegardees. Ctrl-Q: quitter, Echap: annuler",
+  "status.plugin_failed_to_start": "Impossible de demarrer le plugin \"%s\"",
+  "status.plugin_exited": "Le plugin \"%s\" s'est arrete de maniere inattendue",
+  "status.no_plugins_active": "Aucun plugin actif",
 
   "ui.welcome_message": "Cera editor -- version 0.1.0",
   "search.prefix": "recherche: "

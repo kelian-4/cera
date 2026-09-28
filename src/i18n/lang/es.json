@@ -74,6 +74,9 @@
   "status.clipboard_empty": "Portapapeles vacio",
   "status.pasted": "Pegado",
   "status.confirm_quit_unsaved": "Cambios sin guardar. Ctrl-Q: salir, Escape: cancelar",
+  "status.plugin_failed_to_start": "No se pudo iniciar el plugin \"%s\"",
+  "status.plugin_exited": "El plugin \"%s\" se detuvo inesperadamente",
+  "status.no_plugins_active": "Ningun plugin activo",
 
   "ui.welcome_message": "Cera editor -- version 0.1.0",
   "search.prefix": "buscar: "

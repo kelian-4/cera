@@ -46,6 +46,13 @@ pub struct Config {
     /// Code de langue force par l'utilisateur (ex: "fr", "en", "es"). Si
     /// absent, la langue du systeme (LANG/LC_ALL) est utilisee.
     pub language: Option<String>,
+    /// Identifiants des plugins actives (noms des dossiers sous
+    /// `plugins_directory`). Un plugin present sur le disque mais absent
+    /// de cette liste n'est pas charge.
+    pub plugins_enabled: Vec<String>,
+    /// Dossier contenant les plugins (un sous-dossier par plugin, chacun
+    /// avec un `plugin.json`). Si absent, `~/.config/cera/plugins`.
+    pub plugins_directory: Option<String>,
 }
 
 impl Default for Config {
@@ -58,6 +65,8 @@ impl Default for Config {
             mouse_enabled: true,
             theme: ThemeColors::default(),
             language: None,
+            plugins_enabled: vec!["file-explorer".to_string(), "pretty-cat".to_string()],
+            plugins_directory: None,
         }
     }
 }
@@ -104,6 +113,10 @@ fn default_config_json() -> String {
   "show_line_numbers": true,
   "mouse_enabled": true,
   "language": null,
+  "plugins": {
+    "enabled": ["file-explorer", "pretty-cat"],
+    "directory": null
+  },
   "theme": {
     "normal": "#E8EDF2",
     "comment": "#8FA3B8",
@@ -187,6 +200,28 @@ pub fn load_from_file(path: &str) -> (Config, bool) {
         }
     }
 
+    if let Some(plugins_obj) = root.get("plugins") {
+        if let Some(v) = plugins_obj.get("enabled") {
+            if let Some(arr) = v.as_array() {
+                let names: Vec<String> = arr
+                    .iter()
+                    .filter(|item| item.is_string())
+                    .map(|item| item.as_string(""))
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                cfg.plugins_enabled = names;
+            }
+        }
+        if let Some(v) = plugins_obj.get("directory") {
+            if v.is_string() {
+                let s = v.as_string("");
+                if !s.is_empty() {
+                    cfg.plugins_directory = Some(s);
+                }
+            }
+        }
+    }
+
     if let Some(theme) = root.get("theme") {
         if theme.is_object() {
             apply_theme_field(theme, "normal", &mut cfg.theme.normal);
@@ -216,6 +251,41 @@ mod tests {
         assert!(!loaded);
         assert_eq!(cfg.tab_stop, 8);
         assert_eq!(cfg.quit_times, 1);
+        assert_eq!(
+            cfg.plugins_enabled,
+            vec!["file-explorer".to_string(), "pretty-cat".to_string()]
+        );
+        assert_eq!(cfg.plugins_directory, None);
+    }
+
+    #[test]
+    fn test_config_reads_plugins_section() {
+        let path = "/tmp/cera_rust_test_config_plugins.json";
+        let mut f = fs::File::create(path).unwrap();
+        writeln!(
+            f,
+            r##"{{"plugins": {{"enabled": ["file-explorer"], "directory": "/tmp/my-plugins"}}}}"##
+        )
+        .unwrap();
+
+        let (cfg, loaded) = load_from_file(path);
+        assert!(loaded);
+        assert_eq!(cfg.plugins_enabled, vec!["file-explorer".to_string()]);
+        assert_eq!(cfg.plugins_directory, Some("/tmp/my-plugins".to_string()));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_config_plugins_enabled_can_be_emptied() {
+        let path = "/tmp/cera_rust_test_config_no_plugins.json";
+        let mut f = fs::File::create(path).unwrap();
+        writeln!(f, r##"{{"plugins": {{"enabled": []}}}}"##).unwrap();
+
+        let (cfg, _) = load_from_file(path);
+        assert!(cfg.plugins_enabled.is_empty());
+
+        let _ = fs::remove_file(path);
     }
 
     #[test]

@@ -24,6 +24,7 @@ pub struct Editor {
     clipboard: Clipboard,
     config: Config,
     i18n: crate::i18n::Translations,
+    plugin_manifests: Vec<crate::plugin::registry::PluginManifest>,
 
     screenrows: usize,
     screencols: usize,
@@ -38,6 +39,7 @@ pub struct Editor {
     help_active: bool,
     prompt_text: Option<String>,
     prompt_cursor_offset: Option<usize>,
+    plugin_view: Option<Vec<crate::plugin::protocol::RenderLine>>,
 
     search_active: bool,
     search_term: String,
@@ -64,6 +66,12 @@ impl Editor {
         let syntax_db = syntax::build_database();
         let buffer_manager = BufferManager::new();
         let i18n = crate::i18n::load(config.language.as_deref());
+        let plugin_manifests =
+            crate::plugin::registry::plugins_directory(config.plugins_directory.as_deref())
+                .map(|dir| {
+                    crate::plugin::registry::load_enabled_plugins(&dir, &config.plugins_enabled)
+                })
+                .unwrap_or_default();
 
         Ok(Editor {
             terminal,
@@ -73,6 +81,7 @@ impl Editor {
             quit_times: config.quit_times,
             config,
             i18n,
+            plugin_manifests,
             screenrows: rows as usize,
             screencols: cols as usize,
             status_message: String::new(),
@@ -82,6 +91,7 @@ impl Editor {
             help_active: false,
             prompt_text: None,
             prompt_cursor_offset: None,
+            plugin_view: None,
             search_active: false,
             search_term: String::new(),
             search_cursor: 0,
@@ -133,6 +143,7 @@ impl Editor {
             search_cursor: self.search_cursor,
             config: &self.config,
             i18n: &self.i18n,
+            plugin_view: self.plugin_view.as_deref(),
         }
     }
 
@@ -1063,6 +1074,206 @@ impl Editor {
         }
     }
 
+    /// Convertit un raccourci de manifeste ("^E") en code touche Ctrl
+    /// correspondant, si le format est reconnu.
+    fn shortcut_to_key_code(shortcut: &str) -> Option<i32> {
+        let mut chars = shortcut.chars();
+        if chars.next()? != '^' {
+            return None;
+        }
+        let letter = chars.next()?;
+        if chars.next().is_some() {
+            return None;
+        }
+        Some(ctrl(letter.to_ascii_lowercase()))
+    }
+
+    fn plugin_shortcut_matches(&self, key: i32) -> bool {
+        self.plugin_index_for_shortcut(key).is_some()
+    }
+
+    fn plugin_index_for_shortcut(&self, key: i32) -> Option<usize> {
+        self.plugin_manifests
+            .iter()
+            .position(|m| m.shortcut.as_deref().and_then(Self::shortcut_to_key_code) == Some(key))
+    }
+
+    /// Raccourci de secours (Ctrl-G) : lance directement l'unique plugin
+    /// actif, affiche la liste des plugins disponibles s'il y en a
+    /// plusieurs, ou signale qu'aucun plugin n'est actif.
+    fn open_plugin_palette(&mut self) {
+        match self.plugin_manifests.len() {
+            0 => {
+                let msg = self.i18n.t("status.no_plugins_active");
+                self.set_status_message(msg);
+            }
+            1 => self.run_plugin(0),
+            _ => {
+                let names: Vec<String> = self
+                    .plugin_manifests
+                    .iter()
+                    .enumerate()
+                    .map(|(i, m)| {
+                        let shortcut = m.shortcut.clone().unwrap_or_default();
+                        format!("{}:{} {}", i + 1, m.name, shortcut)
+                    })
+                    .collect();
+                self.set_status_message(names.join("  "));
+            }
+        }
+    }
+
+    fn key_code_to_plugin_key_name(code: i32) -> Option<String> {
+        use crate::terminal::*;
+        let name = match code {
+            ARROW_UP => "Up",
+            ARROW_DOWN => "Down",
+            ARROW_LEFT => "Left",
+            ARROW_RIGHT => "Right",
+            PAGE_UP => "PageUp",
+            PAGE_DOWN => "PageDown",
+            HOME_KEY => "Home",
+            END_KEY => "End",
+            DEL_KEY => "Delete",
+            BACKSPACE => "Backspace",
+            0x1b => "Escape",
+            0x0d => "Enter",
+            0x09 => "Tab",
+            c if (0x20..0x7f).contains(&c) => {
+                return Some((c as u8 as char).to_string());
+            }
+            c if is_encoded_codepoint(c) => {
+                return Some(decode_codepoint(c).to_string());
+            }
+            _ => return None,
+        };
+        Some(name.to_string())
+    }
+
+    /// Lance le plugin d'indice `manifest_idx` (dans `self.plugin_manifests`)
+    /// et prend le controle de l'ecran/clavier jusqu'a ce que le plugin
+    /// ferme sa vue (message `close`), demande a ouvrir un fichier
+    /// (`open_file`), ou que l'utilisateur appuie sur Echap. Le
+    /// sous-processus est toujours termine proprement avant de revenir a
+    /// l'edition normale, quel que soit le chemin de sortie.
+    fn run_plugin(&mut self, manifest_idx: usize) {
+        let Some(manifest) = self.plugin_manifests.get(manifest_idx).cloned() else {
+            return;
+        };
+
+        let runtime_arg = self
+            .buffer_manager
+            .active()
+            .buffer
+            .filename()
+            .map(|s| s.to_string())
+            .or_else(|| {
+                std::env::current_dir()
+                    .ok()
+                    .map(|p| p.to_string_lossy().into_owned())
+            })
+            .unwrap_or_default();
+
+        let mut process = match crate::plugin::manager::PluginProcess::spawn(
+            &manifest.command,
+            &manifest.args,
+            self.screenrows,
+            self.screencols,
+            &[runtime_arg],
+        ) {
+            Ok(p) => p,
+            Err(_) => {
+                let msg = self
+                    .i18n
+                    .t1("status.plugin_failed_to_start", &manifest.name);
+                self.set_status_message_kind(msg, MessageKind::Error);
+                return;
+            }
+        };
+
+        self.plugin_view = Some(Vec::new());
+        let mut last_rows = self.screenrows;
+        let mut last_cols = self.screencols;
+        // On ne redessine l'ecran que lorsque quelque chose a change
+        // (nouveau rendu du plugin, message de statut, redimensionnement) :
+        // read_key() ne bloque pas, donc sans ce drapeau la boucle
+        // redessinerait l'ecran complet des milliers de fois par seconde.
+        let mut needs_redraw = true;
+
+        loop {
+            for message in process.poll_incoming() {
+                match message {
+                    crate::plugin::protocol::IncomingMessage::Render { lines } => {
+                        self.plugin_view = Some(lines);
+                        needs_redraw = true;
+                    }
+                    crate::plugin::protocol::IncomingMessage::Status { message, is_error } => {
+                        let kind = if is_error {
+                            MessageKind::Error
+                        } else {
+                            MessageKind::Info
+                        };
+                        self.set_status_message_kind(message, kind);
+                        needs_redraw = true;
+                    }
+                    crate::plugin::protocol::IncomingMessage::OpenFile { path } => {
+                        process.terminate();
+                        self.plugin_view = None;
+                        self.open_file(&path);
+                        return;
+                    }
+                    crate::plugin::protocol::IncomingMessage::Close => {
+                        process.terminate();
+                        self.plugin_view = None;
+                        return;
+                    }
+                    crate::plugin::protocol::IncomingMessage::Unknown => {}
+                }
+            }
+
+            if !process.is_alive() {
+                self.plugin_view = None;
+                let msg = self.i18n.t1("status.plugin_exited", &manifest.name);
+                self.set_status_message_kind(msg, MessageKind::Error);
+                return;
+            }
+
+            if needs_redraw {
+                self.refresh_screen();
+                needs_redraw = false;
+            }
+
+            let key = self.terminal.read_key().unwrap_or(terminal::NO_KEY);
+
+            self.apply_resize_if_needed();
+            if self.screenrows != last_rows || self.screencols != last_cols {
+                last_rows = self.screenrows;
+                last_cols = self.screencols;
+                process.send(crate::plugin::protocol::OutgoingMessage::resize(
+                    last_rows, last_cols,
+                ));
+                needs_redraw = true;
+            }
+
+            if key == 0x1b {
+                process.terminate();
+                self.plugin_view = None;
+                return;
+            }
+
+            if key != terminal::NO_KEY {
+                if let Some(key_name) = Self::key_code_to_plugin_key_name(key) {
+                    process.send(crate::plugin::protocol::OutgoingMessage::key(&key_name));
+                }
+            } else if !needs_redraw {
+                // Rien a faire ce tour-ci : cede brievement le CPU au lieu
+                // de tourner a vide en attendant une touche ou un message
+                // du plugin.
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+        }
+    }
+
     fn pattern_exists_in_buffer(&self, term: &str) -> bool {
         let ob = self.buffer_manager.active();
         let num_rows = ob.buffer.num_rows();
@@ -1529,6 +1740,13 @@ impl Editor {
             k if k == ctrl('h') => self.toggle_help(),
             k if k == ctrl('d') => self.toggle_full_doc(),
             k if k == ctrl('k') => self.cut_current_line(),
+            k if k == ctrl('g') => self.open_plugin_palette(),
+
+            k if self.plugin_shortcut_matches(k) => {
+                if let Some(idx) = self.plugin_index_for_shortcut(k) {
+                    self.run_plugin(idx);
+                }
+            }
 
             terminal::HOME_KEY => {
                 let ob = self.buffer_manager.active_mut();

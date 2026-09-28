@@ -74,6 +74,9 @@
   "status.clipboard_empty": "Clipboard empty",
   "status.pasted": "Pasted",
   "status.confirm_quit_unsaved": "Unsaved changes. Ctrl-Q: quit, Escape: cancel",
+  "status.plugin_failed_to_start": "Could not start plugin \"%s\"",
+  "status.plugin_exited": "Plugin \"%s\" exited unexpectedly",
+  "status.no_plugins_active": "No plugins active",
 
   "ui.welcome_message": "Cera editor -- version 0.1.0",
   "search.prefix": "search: "

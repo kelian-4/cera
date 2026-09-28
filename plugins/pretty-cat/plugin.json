@@ -1,0 +1,7 @@
+{
+  "name": "Pretty Cat",
+  "description": "Affiche un fichier en lecture seule avec numeros de ligne et coloration syntaxique basique",
+  "command": "python3",
+  "args": ["main.py"],
+  "shortcut": "^A"
+}
