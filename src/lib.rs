@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod editor;
 pub mod i18n;
 pub mod io;

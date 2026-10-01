@@ -5,7 +5,7 @@
 //! rien), pour que la boucle principale de l'editeur reste reactive
 //! (redimensionnement du terminal, etc.) pendant qu'un plugin tourne.
 
-use super::protocol::{parse_incoming, IncomingMessage, OutgoingMessage};
+use super::protocol::{parse_incoming, DisplayMode, IncomingMessage, OutgoingMessage};
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
@@ -33,12 +33,16 @@ impl std::fmt::Display for SpawnError {
 
 impl PluginProcess {
     /// Lance l'executable `command` (avec ses arguments) comme plugin,
-    /// et lui envoie immediatement le message `init`.
+    /// et lui envoie immediatement le message `init`. `panel_width` n'a
+    /// d'effet que pour `DisplayMode::Panel`.
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         command: &str,
         command_args: &[String],
+        mode: DisplayMode,
         screen_rows: usize,
         screen_cols: usize,
+        panel_width: Option<usize>,
         plugin_args: &[String],
     ) -> Result<Self, SpawnError> {
         let child = Command::new(command)
@@ -57,7 +61,13 @@ impl PluginProcess {
             child,
             pending: String::new(),
         };
-        process.send(OutgoingMessage::init(screen_rows, screen_cols, plugin_args));
+        process.send(OutgoingMessage::init(
+            mode,
+            screen_rows,
+            screen_cols,
+            panel_width,
+            plugin_args,
+        ));
         Ok(process)
     }
 
@@ -150,7 +160,8 @@ mod tests {
     #[test]
     fn test_spawn_and_roundtrip_with_cat() {
         let mut process =
-            PluginProcess::spawn("cat", &[], 24, 80, &[]).expect("cat devrait exister");
+            PluginProcess::spawn("cat", &[], DisplayMode::Fullscreen, 24, 80, None, &[])
+                .expect("cat devrait exister");
 
         // Laisse le temps au process de demarrer et de renvoyer le
         // message "init" que nous venons de lui envoyer (cat le renvoie
@@ -175,13 +186,23 @@ mod tests {
 
     #[test]
     fn test_spawn_nonexistent_command_fails() {
-        let result = PluginProcess::spawn("this-command-does-not-exist-cera", &[], 24, 80, &[]);
+        let result = PluginProcess::spawn(
+            "this-command-does-not-exist-cera",
+            &[],
+            DisplayMode::Fullscreen,
+            24,
+            80,
+            None,
+            &[],
+        );
         assert!(result.is_err());
     }
 
     #[test]
     fn test_poll_incoming_never_blocks_when_no_data() {
-        let mut process = PluginProcess::spawn("cat", &[], 24, 80, &[]).expect("cat");
+        let mut process =
+            PluginProcess::spawn("cat", &[], DisplayMode::Fullscreen, 24, 80, None, &[])
+                .expect("cat");
         // Ne rien envoyer de plus : poll_incoming doit retourner
         // immediatement (le test lui-meme a un timeout global via cargo
         // test, donc un blocage ferait echouer/trainer le test).
@@ -198,7 +219,7 @@ mod bundled_plugin_tests {
     //! lances comme de vrais sous-processus Python via `PluginProcess`.
     //! Ignores silencieusement si `python3` n'est pas disponible.
     use super::*;
-    use crate::plugin::protocol::{IncomingMessage, OutgoingMessage};
+    use crate::plugin::protocol::{DisplayMode, IncomingMessage, OutgoingMessage};
     use std::path::PathBuf;
 
     fn python_available() -> bool {
@@ -245,8 +266,10 @@ mod bundled_plugin_tests {
         let mut process = PluginProcess::spawn(
             "python3",
             &[plugin_script("pretty-cat")],
+            DisplayMode::Fullscreen,
             10,
             60,
+            None,
             &[file.to_string_lossy().into_owned()],
         )
         .expect("python3 should start");
@@ -260,7 +283,7 @@ mod bundled_plugin_tests {
         let render = messages
             .into_iter()
             .find_map(|m| match m {
-                IncomingMessage::Render { lines } => Some(lines),
+                IncomingMessage::Render { lines, .. } => Some(lines),
                 _ => None,
             })
             .expect("pretty-cat should send a render message");
@@ -293,8 +316,10 @@ mod bundled_plugin_tests {
         let mut process = PluginProcess::spawn(
             "python3",
             &[plugin_script("file-explorer")],
+            DisplayMode::Panel,
             10,
             60,
+            Some(28),
             &[dir.to_string_lossy().into_owned()],
         )
         .expect("python3 should start");
@@ -306,7 +331,7 @@ mod bundled_plugin_tests {
         let listing: String = first
             .iter()
             .filter_map(|m| match m {
-                IncomingMessage::Render { lines } => Some(lines),
+                IncomingMessage::Render { lines, .. } => Some(lines),
                 _ => None,
             })
             .flat_map(|lines| lines.iter())
@@ -315,7 +340,7 @@ mod bundled_plugin_tests {
         assert!(listing.contains("only.txt"));
 
         // Entree sur l'unique fichier -> demande d'ouverture.
-        process.send(OutgoingMessage::key("Enter"));
+        process.send(OutgoingMessage::key("Enter", true));
         let after = wait_for(&mut process, |m| {
             m.iter()
                 .any(|x| matches!(x, IncomingMessage::OpenFile { .. }))

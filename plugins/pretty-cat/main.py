@@ -4,8 +4,14 @@ Plugin Cera "Pretty Cat" : affiche un fichier en lecture seule, avec
 numeros de ligne et une coloration syntaxique basique (mots-cles, chaines,
 commentaires) selon l'extension du fichier.
 
-Protocole : un message JSON par ligne, sur stdin (recu) et stdout (envoye).
-Voir le README du dossier plugins/ pour le detail du protocole.
+Deux modes :
+- Protocole plugin (par defaut) : un message JSON par ligne, sur stdin
+  (recu) et stdout (envoye). Voir le README du dossier plugins/ pour le
+  detail du protocole. C'est ce mode qu'utilise Cera en interne (raccourci
+  ^A).
+- `main.py --cat fichier...` : mode non interactif utilise par
+  `cera -a`, qui ecrit directement le contenu colore des fichiers sur
+  stdout, comme `cat`, sans protocole JSON.
 """
 import json
 import sys
@@ -152,7 +158,52 @@ def render(lines, top, screen_rows, screen_cols, path, error=None):
     send({"type": "render", "lines": out_lines})
 
 
+def ansi_fg(hex_color, bold=False):
+    hex_color = hex_color.lstrip("#")
+    r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+    prefix = "\x1b[1m" if bold else ""
+    return f"{prefix}\x1b[38;2;{r};{g};{b}m"
+
+
+ANSI_RESET = "\x1b[0m"
+
+
+def cat_mode(paths):
+    """Mode non interactif, utilise par `cera -a` : ecrit directement sur
+    stdout le contenu colore des fichiers donnes, numeros de ligne inclus,
+    puis quitte -- comme `cat`, sans protocole JSON ni lecture de stdin.
+    Code de sortie 0 si tous les fichiers ont pu etre lus, 1 sinon (encore
+    comme `cat`)."""
+    exit_code = 0
+    for path in paths:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+        except OSError as e:
+            sys.stderr.write(f"cera -a: {path}: {e.strerror or e}\n")
+            exit_code = 1
+            continue
+
+        ext = ext_of(path)
+        gutter_width = max(3, len(str(len(lines)))) + 1
+        for i, raw_line in enumerate(lines):
+            line_text = raw_line.rstrip("\n")
+            lineno = str(i + 1).rjust(gutter_width - 1) + " "
+            sys.stdout.write(ansi_fg(COLOR_LINENO))
+            sys.stdout.write(lineno)
+            sys.stdout.write(ANSI_RESET)
+            for segment in highlight_line(line_text, ext):
+                sys.stdout.write(ansi_fg(segment["color"], segment.get("bold", False)))
+                sys.stdout.write(segment["text"])
+                sys.stdout.write(ANSI_RESET)
+            sys.stdout.write("\n")
+    return exit_code
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--cat":
+        sys.exit(cat_mode(sys.argv[2:]))
+
     init = read_message()
     if init.get("type") != "init":
         return

@@ -4,11 +4,22 @@
 //! Cera le lance en sous-processus et echange des messages JSON, un par
 //! ligne, sur son entree/sortie standard :
 //!
-//! - Cera -> plugin : `init`, `key`, `resize`, `shutdown`.
-//! - plugin -> Cera : `render` (affiche une vue plein ecran a la place du
-//!   buffer), `open_file` (demande a Cera d'ouvrir un fichier en edition),
-//!   `status` (message dans la barre de statut), `close` (ferme la vue et
-//!   revient a l'edition).
+//! - Cera -> plugin : `init`, `key`, `click`, `resize`, `focus`, `shutdown`.
+//! - plugin -> Cera : `render` (affiche une vue plein ecran ou un panneau
+//!   lateral, selon le mode annonce dans `init`), `open_file` (demande a
+//!   Cera d'ouvrir un fichier en edition), `status` (message dans la barre
+//!   de statut), `close` (ferme la vue et revient a l'edition).
+//!
+//! Deux modes d'affichage, fixes pour toute la duree de vie du plugin et
+//! annonces une fois dans `init` :
+//! - `fullscreen` : le plugin remplace tout l'ecran (barres de statut et
+//!   d'aide comprises).
+//! - `panel` : le plugin est affiche dans une colonne a gauche de l'ecran,
+//!   l'editeur restant visible et utilisable a droite. Le plugin recoit sa
+//!   largeur disponible dans `init.panel_width`, et peut la faire varier
+//!   d'un rendu a l'autre en incluant son propre `panel_width` dans le
+//!   message `render` (par exemple pour s'adapter a la longueur des noms
+//!   de fichiers affiches).
 //!
 //! Ce fichier ne fait que construire/lire ces messages ; `manager.rs` gere
 //! le sous-processus lui-meme.
@@ -32,29 +43,65 @@ pub fn json_escape(s: &str) -> String {
     out
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DisplayMode {
+    Fullscreen,
+    Panel,
+}
+
+impl DisplayMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            DisplayMode::Fullscreen => "fullscreen",
+            DisplayMode::Panel => "panel",
+        }
+    }
+}
+
 /// Un message Cera -> plugin, deja serialise en une ligne JSON (sans le
 /// retour a la ligne final, ajoute par le manager au moment de l'ecriture).
 pub struct OutgoingMessage(pub String);
 
 impl OutgoingMessage {
-    pub fn init(screen_rows: usize, screen_cols: usize, args: &[String]) -> Self {
+    /// `panel_width` n'est significatif que pour `DisplayMode::Panel` ; il
+    /// est omis du message pour un plugin plein ecran.
+    pub fn init(
+        mode: DisplayMode,
+        screen_rows: usize,
+        screen_cols: usize,
+        panel_width: Option<usize>,
+        args: &[String],
+    ) -> Self {
         let args_json: Vec<String> = args
             .iter()
             .map(|a| format!("\"{}\"", json_escape(a)))
             .collect();
+        let panel_width_field = match mode {
+            DisplayMode::Panel => format!(",\"panel_width\":{}", panel_width.unwrap_or(30)),
+            DisplayMode::Fullscreen => String::new(),
+        };
         Self(format!(
-            "{{\"type\":\"init\",\"screen_rows\":{},\"screen_cols\":{},\"args\":[{}]}}",
+            "{{\"type\":\"init\",\"mode\":\"{}\",\"screen_rows\":{},\"screen_cols\":{}{},\"args\":[{}]}}",
+            mode.as_str(),
             screen_rows,
             screen_cols,
+            panel_width_field,
             args_json.join(",")
         ))
     }
 
-    pub fn key(key_name: &str) -> Self {
+    pub fn key(key_name: &str, focused: bool) -> Self {
         Self(format!(
-            "{{\"type\":\"key\",\"key\":\"{}\"}}",
-            json_escape(key_name)
+            "{{\"type\":\"key\",\"key\":\"{}\",\"focused\":{}}}",
+            json_escape(key_name),
+            focused
         ))
+    }
+
+    /// Un clic dans un panneau lateral, sur la ligne `row` (0-indexee,
+    /// relative au premier rang de la zone de rendu du plugin).
+    pub fn click(row: usize) -> Self {
+        Self(format!("{{\"type\":\"click\",\"row\":{}}}", row))
     }
 
     pub fn resize(screen_rows: usize, screen_cols: usize) -> Self {
@@ -62,6 +109,10 @@ impl OutgoingMessage {
             "{{\"type\":\"resize\",\"screen_rows\":{},\"screen_cols\":{}}}",
             screen_rows, screen_cols
         ))
+    }
+
+    pub fn focus(focused: bool) -> Self {
+        Self(format!("{{\"type\":\"focus\",\"focused\":{}}}", focused))
     }
 
     pub fn shutdown() -> Self {
@@ -87,6 +138,9 @@ pub struct RenderLine {
 pub enum IncomingMessage {
     Render {
         lines: Vec<RenderLine>,
+        /// Largeur souhaitee par un plugin en mode panneau, si precisee
+        /// dans ce rendu (ignoree pour un plugin plein ecran).
+        panel_width: Option<usize>,
     },
     OpenFile {
         path: String,
@@ -148,7 +202,11 @@ pub fn parse_incoming(line: &str) -> Option<IncomingMessage> {
                 }
                 lines.push(RenderLine { segments });
             }
-            Some(IncomingMessage::Render { lines })
+            let panel_width = value
+                .get("panel_width")
+                .filter(|v| v.is_number())
+                .map(|v| v.as_i64(0).max(0) as usize);
+            Some(IncomingMessage::Render { lines, panel_width })
         }
         "open_file" => {
             let path = value.get("path")?.as_string("");
@@ -188,18 +246,48 @@ mod tests {
     }
 
     #[test]
-    fn test_outgoing_init_message_shape() {
-        let msg = OutgoingMessage::init(40, 120, &["/tmp/foo".to_string()]);
+    fn test_outgoing_init_message_shape_fullscreen() {
+        let msg = OutgoingMessage::init(
+            DisplayMode::Fullscreen,
+            40,
+            120,
+            None,
+            &["/tmp/foo".to_string()],
+        );
         assert_eq!(
             msg.0,
-            "{\"type\":\"init\",\"screen_rows\":40,\"screen_cols\":120,\"args\":[\"/tmp/foo\"]}"
+            "{\"type\":\"init\",\"mode\":\"fullscreen\",\"screen_rows\":40,\"screen_cols\":120,\"args\":[\"/tmp/foo\"]}"
+        );
+    }
+
+    #[test]
+    fn test_outgoing_init_message_shape_panel() {
+        let msg = OutgoingMessage::init(
+            DisplayMode::Panel,
+            40,
+            120,
+            Some(28),
+            &["/tmp/foo".to_string()],
+        );
+        assert_eq!(
+            msg.0,
+            "{\"type\":\"init\",\"mode\":\"panel\",\"screen_rows\":40,\"screen_cols\":120,\"panel_width\":28,\"args\":[\"/tmp/foo\"]}"
         );
     }
 
     #[test]
     fn test_outgoing_key_message_shape() {
-        let msg = OutgoingMessage::key("Down");
-        assert_eq!(msg.0, "{\"type\":\"key\",\"key\":\"Down\"}");
+        let msg = OutgoingMessage::key("Down", true);
+        assert_eq!(
+            msg.0,
+            "{\"type\":\"key\",\"key\":\"Down\",\"focused\":true}"
+        );
+    }
+
+    #[test]
+    fn test_outgoing_focus_message_shape() {
+        let msg = OutgoingMessage::focus(false);
+        assert_eq!(msg.0, "{\"type\":\"focus\",\"focused\":false}");
     }
 
     #[test]
@@ -207,12 +295,25 @@ mod tests {
         let line = r##"{"type":"render","lines":[{"segments":[{"text":"src/","color":"#82C0FF","bold":true}]}]}"##;
         let msg = parse_incoming(line).unwrap();
         match msg {
-            IncomingMessage::Render { lines } => {
+            IncomingMessage::Render { lines, panel_width } => {
                 assert_eq!(lines.len(), 1);
                 assert_eq!(lines[0].segments.len(), 1);
                 assert_eq!(lines[0].segments[0].text, "src/");
                 assert_eq!(lines[0].segments[0].color, Some(0x82C0FF));
                 assert!(lines[0].segments[0].bold);
+                assert_eq!(panel_width, None);
+            }
+            _ => panic!("expected Render"),
+        }
+    }
+
+    #[test]
+    fn test_parse_render_message_with_panel_width() {
+        let line = r##"{"type":"render","lines":[],"panel_width":25}"##;
+        let msg = parse_incoming(line).unwrap();
+        match msg {
+            IncomingMessage::Render { panel_width, .. } => {
+                assert_eq!(panel_width, Some(25));
             }
             _ => panic!("expected Render"),
         }

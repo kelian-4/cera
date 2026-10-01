@@ -33,6 +33,9 @@ pub struct ViewState<'a> {
     /// l'affichage du buffer (tab bar, aide et barres de statut/message
     /// compris) par ces lignes.
     pub plugin_view: Option<&'a [crate::plugin::protocol::RenderLine]>,
+    /// Si `Some`, un panneau lateral (lignes, largeur, focus) est ouvert a
+    /// gauche de l'editeur, qui reste visible et utilisable a droite.
+    pub side_panel: Option<(&'a [crate::plugin::protocol::RenderLine], usize, bool)>,
 }
 
 pub struct AppendBuffer {
@@ -119,6 +122,23 @@ pub fn gutter_width(state: &ViewState) -> usize {
     digit_count(buf.num_rows().max(1)) + 2
 }
 
+/// Largeur du panneau lateral (0 si aucun n'est ouvert), y compris son
+/// separateur d'un caractere avec le texte.
+pub fn side_panel_width(state: &ViewState) -> usize {
+    state.side_panel.map(|(_, width, _)| width + 1).unwrap_or(0)
+}
+
+/// Nombre de colonnes disponibles pour le texte du buffer : la largeur de
+/// l'ecran moins la gouttiere de numeros de ligne et le panneau lateral
+/// s'il est ouvert.
+pub fn text_area_screen_cols(state: &ViewState) -> usize {
+    state
+        .screencols
+        .saturating_sub(gutter_width(state))
+        .saturating_sub(side_panel_width(state))
+        .max(1)
+}
+
 pub fn text_area_screen_rows(state: &ViewState) -> usize {
     let mut reserved = status_bar_rows(state) + message_bar_rows(state);
     if state.buffer_manager.count() > 1 {
@@ -201,12 +221,57 @@ fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\r\n");
 }
 
+/// Dessine la portion du panneau lateral correspondant a la ligne ecran
+/// `y` (0-indexee, dans la zone de texte), suivie d'un separateur vertical
+/// d'un caractere. Si le plugin a rendu moins de lignes que la hauteur de
+/// l'ecran, les lignes manquantes sont simplement des espaces.
+fn draw_panel_row(
+    ab: &mut AppendBuffer,
+    state: &ViewState,
+    panel_lines: &[crate::plugin::protocol::RenderLine],
+    y: usize,
+    width: usize,
+) {
+    let theme = &state.config.theme;
+    let true_color = state.config.true_color;
+
+    let mut written = 0usize;
+    if let Some(line) = panel_lines.get(y) {
+        for segment in &line.segments {
+            if written >= width {
+                break;
+            }
+            let color = segment.color.unwrap_or(theme.normal);
+            ab.append(&fg_sequence(color, true_color));
+            if segment.bold {
+                ab.append("\x1b[1m");
+            }
+            let remaining = width - written;
+            let text_len = segment.text.chars().count().min(remaining);
+            let text_trunc: String = segment.text.chars().take(text_len).collect();
+            ab.append(&text_trunc);
+            if segment.bold {
+                ab.append("\x1b[22m");
+            }
+            ab.append(reset_fg_sequence());
+            written += text_len;
+        }
+    }
+    for _ in written..width {
+        ab.append(" ");
+    }
+    // Separateur vertical entre le panneau et le texte.
+    ab.append(&fg_sequence(theme.comment, true_color));
+    ab.append("\u{2502}");
+    ab.append(reset_fg_sequence());
+}
+
 fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
     let ob = state.buffer_manager.active();
     let buffer = &ob.buffer;
     let text_rows = text_area_screen_rows(state);
     let gutter = gutter_width(state);
-    let text_cols = state.screencols.saturating_sub(gutter).max(1);
+    let text_cols = text_area_screen_cols(state);
 
     let true_color = state.config.true_color;
     let theme = &state.config.theme;
@@ -220,6 +285,10 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
 
     for y in 0..text_rows {
         let filerow = y + state.rowoff;
+
+        if let Some((panel_lines, width, _)) = state.side_panel {
+            draw_panel_row(ab, state, panel_lines, y, width);
+        }
 
         if gutter > 0 {
             ab.append(&fg_sequence(theme.line_number_fg, true_color));
@@ -787,18 +856,28 @@ pub fn refresh(state: &ViewState) -> String {
 
     let ob = state.buffer_manager.active();
     let gutter = gutter_width(state);
+    let panel_width = side_panel_width(state);
     let tab_bar_height = if state.buffer_manager.count() > 1 {
         1
     } else {
         0
     };
 
+    let panel_focused = state
+        .side_panel
+        .map(|(_, _, focused)| focused)
+        .unwrap_or(false);
+    if panel_focused {
+        ab.append("\x1b[?25l");
+        return ab.data().to_string();
+    }
+
     // Le curseur reel du terminal reste toujours sur le document, meme
     // pendant un prompt ou une recherche : la position de saisie est
     // indiquee separement par un curseur custom (video inversee) dessine
     // dans draw_status_bar, pour qu'on voie les deux a la fois.
     let cursor_row = tab_bar_height + (ob.cursor.cy.saturating_sub(state.rowoff)) + 1;
-    let cursor_col = gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;
+    let cursor_col = panel_width + gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;
     ab.append(&format!("\x1b[{};{}H", cursor_row, cursor_col));
 
     ab.append("\x1b[?25h");

@@ -37,6 +37,9 @@ pub struct PluginManifest {
     /// Raccourci suggere (informatif ; l'activation reelle du raccourci
     /// clavier est geree par l'editeur, pas par le plugin).
     pub shortcut: Option<String>,
+    /// Mode d'affichage declare par le plugin (`"panel"` ou
+    /// `"fullscreen"`, `fullscreen` par defaut si absent du manifeste).
+    pub mode: crate::plugin::protocol::DisplayMode,
 }
 
 fn default_plugins_directory() -> Option<PathBuf> {
@@ -119,6 +122,15 @@ fn parse_manifest(id: &str, plugin_dir: &Path, content: &str) -> Option<PluginMa
         .map(|v| v.as_string(""))
         .filter(|s| !s.is_empty());
 
+    let mode = match value
+        .get("mode")
+        .map(|v| v.as_string("fullscreen"))
+        .as_deref()
+    {
+        Some("panel") => crate::plugin::protocol::DisplayMode::Panel,
+        _ => crate::plugin::protocol::DisplayMode::Fullscreen,
+    };
+
     Some(PluginManifest {
         id: id.to_string(),
         name,
@@ -126,6 +138,7 @@ fn parse_manifest(id: &str, plugin_dir: &Path, content: &str) -> Option<PluginMa
         command,
         args,
         shortcut,
+        mode,
     })
 }
 

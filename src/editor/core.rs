@@ -17,6 +17,17 @@ fn ctrl(c: char) -> i32 {
     (c as i32) & 0x1f
 }
 
+pub struct SidePanel {
+    process: crate::plugin::manager::PluginProcess,
+    manifest_idx: usize,
+    lines: Vec<crate::plugin::protocol::RenderLine>,
+    width: usize,
+    /// Si `true`, les touches de navigation vont au panneau ; sinon elles
+    /// vont a l'editeur comme d'habitude (seul Ctrl-E et quelques touches
+    /// de gestion du panneau restent actives dans les deux cas).
+    focused: bool,
+}
+
 pub struct Editor {
     terminal: Terminal,
     buffer_manager: BufferManager,
@@ -25,6 +36,7 @@ pub struct Editor {
     config: Config,
     i18n: crate::i18n::Translations,
     plugin_manifests: Vec<crate::plugin::registry::PluginManifest>,
+    side_panel: Option<SidePanel>,
 
     screenrows: usize,
     screencols: usize,
@@ -82,6 +94,7 @@ impl Editor {
             config,
             i18n,
             plugin_manifests,
+            side_panel: None,
             screenrows: rows as usize,
             screencols: cols as usize,
             status_message: String::new(),
@@ -119,6 +132,14 @@ impl Editor {
             if let Ok((rows, cols)) = self.terminal.get_window_size() {
                 self.screenrows = rows as usize;
                 self.screencols = cols as usize;
+                if let Some(panel) = &mut self.side_panel {
+                    panel
+                        .process
+                        .send(crate::plugin::protocol::OutgoingMessage::resize(
+                            self.screenrows,
+                            self.screencols,
+                        ));
+                }
             }
         }
     }
@@ -144,6 +165,10 @@ impl Editor {
             config: &self.config,
             i18n: &self.i18n,
             plugin_view: self.plugin_view.as_deref(),
+            side_panel: self
+                .side_panel
+                .as_ref()
+                .map(|p| (p.lines.as_slice(), p.width, p.focused)),
         }
     }
 
@@ -151,8 +176,7 @@ impl Editor {
         let search = SearchDisplayInfo::default();
         let state = self.build_view_state(search);
         let text_rows = screen_renderer::text_area_screen_rows(&state);
-        let gutter = screen_renderer::gutter_width(&state);
-        let text_cols = self.screencols.saturating_sub(gutter);
+        let text_cols = screen_renderer::text_area_screen_cols(&state);
 
         let ob = self.buffer_manager.active_mut();
 
@@ -192,6 +216,7 @@ impl Editor {
 
     pub fn run(&mut self) -> ! {
         loop {
+            self.poll_side_panel();
             self.refresh_screen();
             self.process_keypress();
         }
@@ -1156,29 +1181,32 @@ impl Editor {
     /// (`open_file`), ou que l'utilisateur appuie sur Echap. Le
     /// sous-processus est toujours termine proprement avant de revenir a
     /// l'edition normale, quel que soit le chemin de sortie.
+    /// Lance en plein ecran le plugin d'indice `manifest_idx` (dans
+    /// `self.plugin_manifests`) et prend le controle de l'ecran/clavier
+    /// jusqu'a ce que le plugin ferme sa vue (message `close`), demande a
+    /// ouvrir un fichier (`open_file`), ou que l'utilisateur appuie sur
+    /// Echap. Le sous-processus est toujours termine proprement avant de
+    /// revenir a l'edition normale, quel que soit le chemin de sortie.
+    /// Ignore silencieusement un plugin declare en mode panneau : c'est
+    /// `toggle_side_panel` qu'il faut appeler pour ceux-la.
     fn run_plugin(&mut self, manifest_idx: usize) {
         let Some(manifest) = self.plugin_manifests.get(manifest_idx).cloned() else {
             return;
         };
+        if manifest.mode == crate::plugin::protocol::DisplayMode::Panel {
+            self.toggle_side_panel(manifest_idx);
+            return;
+        }
 
-        let runtime_arg = self
-            .buffer_manager
-            .active()
-            .buffer
-            .filename()
-            .map(|s| s.to_string())
-            .or_else(|| {
-                std::env::current_dir()
-                    .ok()
-                    .map(|p| p.to_string_lossy().into_owned())
-            })
-            .unwrap_or_default();
+        let runtime_arg = self.current_file_or_dir_arg();
 
         let mut process = match crate::plugin::manager::PluginProcess::spawn(
             &manifest.command,
             &manifest.args,
+            crate::plugin::protocol::DisplayMode::Fullscreen,
             self.screenrows,
             self.screencols,
+            None,
             &[runtime_arg],
         ) {
             Ok(p) => p,
@@ -1203,7 +1231,7 @@ impl Editor {
         loop {
             for message in process.poll_incoming() {
                 match message {
-                    crate::plugin::protocol::IncomingMessage::Render { lines } => {
+                    crate::plugin::protocol::IncomingMessage::Render { lines, .. } => {
                         self.plugin_view = Some(lines);
                         needs_redraw = true;
                     }
@@ -1263,7 +1291,9 @@ impl Editor {
 
             if key != terminal::NO_KEY {
                 if let Some(key_name) = Self::key_code_to_plugin_key_name(key) {
-                    process.send(crate::plugin::protocol::OutgoingMessage::key(&key_name));
+                    process.send(crate::plugin::protocol::OutgoingMessage::key(
+                        &key_name, true,
+                    ));
                 }
             } else if !needs_redraw {
                 // Rien a faire ce tour-ci : cede brievement le CPU au lieu
@@ -1271,6 +1301,214 @@ impl Editor {
                 // du plugin.
                 std::thread::sleep(std::time::Duration::from_millis(2));
             }
+        }
+    }
+
+    /// Le fichier actuellement ouvert, ou le repertoire courant si aucun
+    /// fichier n'est ouvert : c'est l'argument runtime transmis a un
+    /// plugin plein ecran a son lancement.
+    fn current_file_or_dir_arg(&self) -> String {
+        self.buffer_manager
+            .active()
+            .buffer
+            .filename()
+            .map(|s| s.to_string())
+            .or_else(|| {
+                std::env::current_dir()
+                    .ok()
+                    .map(|p| p.to_string_lossy().into_owned())
+            })
+            .unwrap_or_default()
+    }
+
+    const SIDE_PANEL_WIDTH: usize = 30;
+
+    /// Ouvre le panneau lateral avec le plugin d'indice `manifest_idx` s'il
+    /// n'est pas deja ouvert ; sinon bascule le focus entre le panneau et
+    /// l'editeur ; Ctrl-E sur le panneau deja ouvert et focalise le ferme.
+    fn toggle_side_panel(&mut self, manifest_idx: usize) {
+        if let Some(panel) = &mut self.side_panel {
+            if panel.manifest_idx == manifest_idx {
+                if panel.focused {
+                    self.close_side_panel();
+                } else {
+                    panel.focused = true;
+                    panel
+                        .process
+                        .send(crate::plugin::protocol::OutgoingMessage::focus(true));
+                }
+                return;
+            }
+            // Un autre plugin panneau est deja ouvert : on le remplace.
+            self.close_side_panel();
+        }
+
+        let runtime_arg = self.current_file_or_dir_arg();
+        self.open_side_panel_with_arg(manifest_idx, runtime_arg);
+    }
+
+    /// Variante de `toggle_side_panel` pour un lancement explicite avec un
+    /// chemin donne (utilisee par `-e [dossier]` en ligne de commande).
+    /// Remplace un panneau deja ouvert plutot que de basculer son focus :
+    /// `-e` demande toujours a explorer ce dossier precis.
+    pub fn open_explorer_on(&mut self, dir: &str) -> Result<(), String> {
+        let idx = self
+            .plugin_manifests
+            .iter()
+            .position(|m| m.mode == crate::plugin::protocol::DisplayMode::Panel);
+        let Some(idx) = idx else {
+            return Err(self.i18n.t("cli.explorer_plugin_not_loaded"));
+        };
+        self.close_side_panel();
+        self.open_side_panel_with_arg(idx, dir.to_string());
+        Ok(())
+    }
+
+    fn open_side_panel_with_arg(&mut self, manifest_idx: usize, runtime_arg: String) {
+        let Some(manifest) = self.plugin_manifests.get(manifest_idx).cloned() else {
+            return;
+        };
+        let width = Self::SIDE_PANEL_WIDTH.min(self.screencols.saturating_sub(10).max(10));
+
+        match crate::plugin::manager::PluginProcess::spawn(
+            &manifest.command,
+            &manifest.args,
+            crate::plugin::protocol::DisplayMode::Panel,
+            self.screenrows,
+            self.screencols,
+            Some(width),
+            &[runtime_arg],
+        ) {
+            Ok(process) => {
+                self.side_panel = Some(SidePanel {
+                    process,
+                    manifest_idx,
+                    lines: Vec::new(),
+                    width,
+                    focused: true,
+                });
+            }
+            Err(_) => {
+                let msg = self
+                    .i18n
+                    .t1("status.plugin_failed_to_start", &manifest.name);
+                self.set_status_message_kind(msg, MessageKind::Error);
+            }
+        }
+    }
+
+    fn close_side_panel(&mut self) {
+        if let Some(mut panel) = self.side_panel.take() {
+            panel.process.terminate();
+        }
+    }
+
+    /// A appeler a chaque tour de la boucle principale : lit sans bloquer
+    /// les messages en attente du plugin du panneau lateral (s'il y en a
+    /// un) et les applique. Ferme le panneau si le plugin s'est termine ou
+    /// a demande sa propre fermeture.
+    fn poll_side_panel(&mut self) {
+        let Some(panel) = &mut self.side_panel else {
+            return;
+        };
+        let messages = panel.process.poll_incoming();
+
+        for message in messages {
+            match message {
+                crate::plugin::protocol::IncomingMessage::Render { lines, panel_width } => {
+                    let max_width = self.screencols.saturating_sub(10).max(10);
+                    if let Some(panel) = &mut self.side_panel {
+                        panel.lines = lines;
+                        if let Some(w) = panel_width {
+                            panel.width = w.clamp(10, max_width);
+                        }
+                    }
+                }
+                crate::plugin::protocol::IncomingMessage::Status { message, is_error } => {
+                    let kind = if is_error {
+                        MessageKind::Error
+                    } else {
+                        MessageKind::Info
+                    };
+                    self.set_status_message_kind(message, kind);
+                }
+                crate::plugin::protocol::IncomingMessage::OpenFile { path } => {
+                    self.open_file(&path);
+                    if let Some(panel) = &mut self.side_panel {
+                        panel.focused = false;
+                        panel
+                            .process
+                            .send(crate::plugin::protocol::OutgoingMessage::focus(false));
+                    }
+                }
+                crate::plugin::protocol::IncomingMessage::Close => {
+                    self.close_side_panel();
+                    return;
+                }
+                crate::plugin::protocol::IncomingMessage::Unknown => {}
+            }
+        }
+
+        if let Some(panel) = &mut self.side_panel {
+            if !panel.process.is_alive() {
+                let msg = self
+                    .plugin_manifests
+                    .get(panel.manifest_idx)
+                    .map(|m| m.name.clone());
+                self.close_side_panel();
+                if let Some(name) = msg {
+                    let text = self.i18n.t1("status.plugin_exited", &name);
+                    self.set_status_message_kind(text, MessageKind::Error);
+                }
+            }
+        }
+    }
+
+    fn side_panel_has_focus(&self) -> bool {
+        self.side_panel.as_ref().is_some_and(|p| p.focused)
+    }
+
+    /// Un clic dans le panneau lateral lui donne le focus et lui transmet
+    /// la ligne cliquee, pour qu'il puisse deplacer sa propre selection
+    /// dessus (le plugin sait, lui, a quelle entree correspond cette ligne
+    /// apres defilement).
+    fn click_side_panel_row(&mut self, row: usize) {
+        if let Some(panel) = &mut self.side_panel {
+            if !panel.focused {
+                panel.focused = true;
+                panel
+                    .process
+                    .send(crate::plugin::protocol::OutgoingMessage::focus(true));
+            }
+            panel
+                .process
+                .send(crate::plugin::protocol::OutgoingMessage::click(row));
+        }
+    }
+
+    /// Transmet une touche au plugin du panneau lateral. Echap rend le
+    /// focus a l'editeur plutot que de fermer le panneau (fermer se fait
+    /// via Ctrl-E), pour rester coherent avec le reste de Cera ou Echap
+    /// annule une action en cours sans jamais fermer une fenetre entiere.
+    fn forward_key_to_side_panel(&mut self, key: i32) {
+        if key == 0x1b {
+            if let Some(panel) = &mut self.side_panel {
+                panel.focused = false;
+                panel
+                    .process
+                    .send(crate::plugin::protocol::OutgoingMessage::focus(false));
+            }
+            return;
+        }
+        let Some(key_name) = Self::key_code_to_plugin_key_name(key) else {
+            return;
+        };
+        if let Some(panel) = &mut self.side_panel {
+            panel
+                .process
+                .send(crate::plugin::protocol::OutgoingMessage::key(
+                    &key_name, true,
+                ));
         }
     }
 
@@ -1614,6 +1852,19 @@ impl Editor {
             0
         };
 
+        if let Some(panel) = &self.side_panel {
+            let panel_width = panel.width as i32;
+            if ev.x < panel_width {
+                if ev.pressed && !ev.is_drag {
+                    let row = ev.y - tab_bar_height;
+                    if row >= 0 {
+                        self.click_side_panel_row(row as usize);
+                    }
+                }
+                return;
+            }
+        }
+
         if tab_bar_height > 0 && ev.y == 0 && ev.pressed && !ev.is_drag {
             let mut col = 0i32;
             for i in 0..self.buffer_manager.count() {
@@ -1640,9 +1891,10 @@ impl Editor {
         let search = SearchDisplayInfo::default();
         let state = self.build_view_state(search);
         let gutter = screen_renderer::gutter_width(&state) as i32;
+        let panel_width = screen_renderer::side_panel_width(&state) as i32;
 
         let screen_row = ev.y - tab_bar_height;
-        let mut screen_col = ev.x - gutter;
+        let mut screen_col = ev.x - panel_width - gutter;
         if screen_row < 0 {
             return;
         }
@@ -1711,6 +1963,11 @@ impl Editor {
         if c == terminal::MOUSE_EVENT {
             let ev = self.terminal.last_mouse_event();
             self.handle_mouse_event(ev);
+            return;
+        }
+
+        if self.side_panel_has_focus() && !self.plugin_shortcut_matches(c) && c != ctrl('q') {
+            self.forward_key_to_side_panel(c);
             return;
         }
 

@@ -149,9 +149,9 @@ class Explorer:
             self.scroll_top = self.selected - visible_rows + 1
 
 
-def render(explorer, screen_rows, screen_cols):
+def render(explorer, screen_rows, screen_cols, focused=True):
     out_lines = []
-    header = f" {explorer.root}  -- Entree: ouvrir/deplier, Gauche: replier, q: fermer"
+    header = f" {explorer.root}"
     out_lines.append({"segments": [{"text": header[:screen_cols], "color": COLOR_HEADER, "bold": True}]})
 
     if explorer.error:
@@ -180,7 +180,13 @@ def render(explorer, screen_rows, screen_cols):
         is_selected = idx == explorer.selected
         prefix = "> " if is_selected else "  "
         full_text = (prefix + text)[:screen_cols]
-        segment_color = COLOR_SELECTED_BG_MARK if is_selected else color
+        # La selection reste visible meme quand le panneau n'a pas le
+        # focus (comme l'arbre de fichiers de VS Code), mais sans la
+        # couleur d'accent vive pour indiquer qu'elle est inactive.
+        if is_selected:
+            segment_color = COLOR_SELECTED_BG_MARK if focused else COLOR_DIR
+        else:
+            segment_color = color
         out_lines.append({"segments": [{"text": full_text, "color": segment_color, "bold": is_selected}]})
 
     send({"type": "render", "lines": out_lines})
@@ -192,6 +198,7 @@ def main():
         return
     screen_rows = init.get("screen_rows", 24)
     screen_cols = init.get("screen_cols", 80)
+    panel_mode = init.get("mode") == "panel"
     args = init.get("args", [])
     start_path = args[0] if args else "."
 
@@ -200,7 +207,8 @@ def main():
     start_path = os.path.abspath(start_path)
 
     explorer = Explorer(start_path)
-    render(explorer, screen_rows, screen_cols)
+    focused = True
+    render(explorer, screen_rows, screen_cols, focused)
 
     while True:
         msg = read_message()
@@ -210,10 +218,21 @@ def main():
 
         if msg_type == "shutdown":
             break
+        elif msg_type == "focus":
+            focused = bool(msg.get("focused", True))
+            render(explorer, screen_rows, screen_cols, focused)
         elif msg_type == "resize":
             screen_rows = msg.get("screen_rows", screen_rows)
             screen_cols = msg.get("screen_cols", screen_cols)
-            render(explorer, screen_rows, screen_cols)
+            render(explorer, screen_rows, screen_cols, focused)
+        elif msg_type == "click":
+            # La ligne cliquee est relative au haut de la zone de rendu ;
+            # la premiere ligne est l'en-tete, les suivantes la liste.
+            row = msg.get("row", 0)
+            idx = explorer.scroll_top + row - 1
+            if 0 <= idx < len(explorer.nodes):
+                explorer.selected = idx
+            render(explorer, screen_rows, screen_cols, focused)
         elif msg_type == "key":
             key = msg.get("key", "")
             if key in ("Down", "j"):
@@ -224,7 +243,8 @@ def main():
                 opened = explorer.toggle_or_open()
                 if opened:
                     send({"type": "open_file", "path": opened})
-                    break
+                    if not panel_mode:
+                        break
             elif key == "Right":
                 explorer.expand()
             elif key == "Left":
@@ -232,7 +252,7 @@ def main():
             elif key in ("q", "Q"):
                 send({"type": "close"})
                 break
-            render(explorer, screen_rows, screen_cols)
+            render(explorer, screen_rows, screen_cols, focused)
 
 
 if __name__ == "__main__":

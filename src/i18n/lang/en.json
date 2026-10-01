@@ -77,6 +77,10 @@
   "status.plugin_failed_to_start": "Could not start plugin \"%s\"",
   "status.plugin_exited": "Plugin \"%s\" exited unexpectedly",
   "status.no_plugins_active": "No plugins active",
+  "cli.explorer_plugin_not_loaded": "The file-explorer plugin is not loaded",
+  "cli.pretty_cat_plugin_not_loaded": "The pretty-cat plugin is not loaded (-a needs it)",
+  "cli.is_a_directory_use_e": "\"%s\" is a directory, use -e to explore it",
+  "cli.is_a_directory_enable_plugin": "\"%s\" is a directory, enable the file-explorer plugin to open directories",
 
   "ui.welcome_message": "Cera editor -- version 0.1.0",
   "search.prefix": "search: "
