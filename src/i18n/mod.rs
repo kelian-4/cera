@@ -1,28 +1,8 @@
-//! Systeme de traduction (i18n) de Cera.
-//!
-//! Chaque langue est un simple fichier JSON plat (cle -> texte traduit)
-//! dans `src/i18n/lang/`. Ce format a ete choisi pour que contribuer une
-//! traduction ou en corriger une ne demande aucune connaissance de Rust :
-//! il suffit de dupliquer un des fichiers existants (par exemple
-//! `lang/en.json`) et de traduire chaque valeur, en gardant les cles et
-//! les `%s` (remplaces par une valeur au moment de l'affichage) intacts.
-//!
-//! Pour ajouter une langue :
-//! 1. Copier `src/i18n/lang/en.json` vers `src/i18n/lang/<code>.json`
-//!    (ex: `de.json` pour l'allemand) et traduire chaque valeur.
-//! 2. Ajouter une entree dans `EMBEDDED_LANGUAGES` ci-dessous.
-//!
-//! Aucune autre modification du code n'est necessaire.
-
 use crate::io::json;
 use std::collections::HashMap;
 
-/// Langue de repli utilisee si une cle est absente de la langue active,
-/// ou si la langue demandee n'existe pas du tout.
 const FALLBACK_LANG: &str = "en";
 
-/// Langues embarquees dans le binaire au moment de la compilation. Chaque
-/// fichier JSON correspondant doit exister sous `src/i18n/lang/<code>.json`.
 const EMBEDDED_LANGUAGES: &[(&str, &str)] = &[
     ("fr", include_str!("lang/fr.json")),
     ("en", include_str!("lang/en.json")),
@@ -36,9 +16,6 @@ pub struct Translations {
 }
 
 impl Translations {
-    /// Traduit `key`. Si la cle est absente de la langue active, retombe
-    /// sur l'anglais, puis sur la cle elle-meme (jamais de texte manquant
-    /// a l'ecran, meme si une traduction est incomplete).
     pub fn t(&self, key: &str) -> String {
         self.entries
             .get(key)
@@ -47,8 +24,6 @@ impl Translations {
             .unwrap_or_else(|| key.to_string())
     }
 
-    /// Comme `t`, mais remplace la premiere occurrence de `%s` dans le
-    /// texte traduit par `value`.
     pub fn t1(&self, key: &str, value: &str) -> String {
         self.t(key).replacen("%s", value, 1)
     }
@@ -80,10 +55,6 @@ fn embedded_json_for(lang: &str) -> Option<&'static str> {
         .map(|(_, json)| *json)
 }
 
-/// Detecte la langue preferee du systeme a partir de `LANG`/`LC_ALL`
-/// (format habituel `fr_FR.UTF-8`, `en_US`, `es`...), en ne gardant que le
-/// code de langue a deux lettres avant `_` ou `.`. Retourne `None` si rien
-/// n'est defini ou reconnu.
 pub fn detect_system_language() -> Option<String> {
     for var in ["LC_ALL", "LANG"] {
         if let Ok(val) = std::env::var(var) {
@@ -96,10 +67,6 @@ pub fn detect_system_language() -> Option<String> {
     None
 }
 
-/// Charge les traductions pour `requested_lang` (typiquement un reglage
-/// explicite de `config.json`), ou detecte la langue du systeme si `None`.
-/// Retombe sur l'anglais si la langue demandee/detectee n'est pas
-/// disponible.
 pub fn load(requested_lang: Option<&str>) -> Translations {
     let lang = requested_lang
         .map(|s| s.to_lowercase())

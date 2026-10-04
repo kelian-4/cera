@@ -43,15 +43,8 @@ pub struct Config {
     pub show_line_numbers: bool,
     pub mouse_enabled: bool,
     pub theme: ThemeColors,
-    /// Code de langue force par l'utilisateur (ex: "fr", "en", "es"). Si
-    /// absent, la langue du systeme (LANG/LC_ALL) est utilisee.
     pub language: Option<String>,
-    /// Identifiants des plugins actives (noms des dossiers sous
-    /// `plugins_directory`). Un plugin present sur le disque mais absent
-    /// de cette liste n'est pas charge.
     pub plugins_enabled: Vec<String>,
-    /// Dossier contenant les plugins (un sous-dossier par plugin, chacun
-    /// avec un `plugin.json`). Si absent, `~/.config/cera/plugins`.
     pub plugins_directory: Option<String>,
 }
 
@@ -101,10 +94,6 @@ pub fn default_config_path() -> String {
     "config.json".to_string()
 }
 
-/// Le contenu JSON par defaut ecrit lors de la premiere generation du
-/// fichier de configuration. Reflete exactement les valeurs par defaut de
-/// `Config::default()` / `ThemeColors::default()`, formate lisiblement
-/// pour qu'il soit facile a comprendre et modifier a la main.
 fn default_config_json() -> String {
     r##"{
   "tab_stop": 8,
@@ -134,12 +123,6 @@ fn default_config_json() -> String {
     .to_string()
 }
 
-/// Cree le fichier de configuration avec les valeurs par defaut s'il
-/// n'existe pas deja (creant aussi le dossier parent si besoin). N'ecrase
-/// jamais un fichier existant. Les erreurs d'ecriture sont ignorees
-/// silencieusement : l'editeur doit pouvoir demarrer meme sans pouvoir
-/// creer ce fichier (dossier en lecture seule, etc.), en utilisant les
-/// valeurs par defaut en memoire.
 pub fn ensure_config_file_exists(path: &str) {
     if fs::metadata(path).is_ok() {
         return;
@@ -328,8 +311,6 @@ mod tests {
         ensure_config_file_exists(&path);
         assert!(fs::metadata(&path).is_ok());
 
-        // Le fichier genere doit etre un JSON valide, rechargeable, et
-        // correspondre aux valeurs par defaut.
         let (cfg, loaded) = load_from_file(&path);
         assert!(loaded);
         assert_eq!(cfg.tab_stop, 8);

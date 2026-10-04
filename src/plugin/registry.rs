@@ -1,44 +1,14 @@
-//! Decouverte des plugins installes sur disque.
-//!
-//! Un plugin est un dossier sous le repertoire de plugins (par defaut
-//! `~/.config/cera/plugins`), contenant un manifeste `plugin.json` :
-//!
-//! ```json
-//! {
-//!   "name": "file-explorer",
-//!   "description": "Explorateur de fichiers",
-//!   "command": "python3",
-//!   "args": ["main.py"],
-//!   "shortcut": "^E"
-//! }
-//! ```
-//!
-//! `command` est l'executable a lancer (peut etre un chemin absolu ou un
-//! nom cherche dans PATH, comme `python3`, `node`, `bash`...) ; `args` est
-//! passe tel quel a la commande, sauf qu'un argument qui ne commence pas
-//! par `/` est resolu par rapport au dossier du plugin (typiquement le
-//! chemin du script principal, ex: "main.py" -> ".../plugins/mon-plugin/main.py"),
-//! pour qu'un plugin puisse s'ecrire sans connaitre son propre chemin
-//! d'installation. Un argument qui commence par `/` (chemin absolu) est
-//! laisse tel quel.
-
 use crate::io::json;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PluginManifest {
-    /// Identifiant du plugin : le nom de son dossier, utilise dans
-    /// `plugins.enabled` de config.json.
     pub id: String,
     pub name: String,
     pub description: String,
     pub command: String,
     pub args: Vec<String>,
-    /// Raccourci suggere (informatif ; l'activation reelle du raccourci
-    /// clavier est geree par l'editeur, pas par le plugin).
     pub shortcut: Option<String>,
-    /// Mode d'affichage declare par le plugin (`"panel"` ou
-    /// `"fullscreen"`, `fullscreen` par defaut si absent du manifeste).
     pub mode: crate::plugin::protocol::DisplayMode,
 }
 
@@ -87,11 +57,6 @@ fn parse_manifest(id: &str, plugin_dir: &Path, content: &str) -> Option<PluginMa
     if command_raw.is_empty() {
         return None;
     }
-    // Une commande qui contient un separateur de chemin est resolue par
-    // rapport au dossier du plugin (ex: "./main" ou "bin/tool"), pour
-    // qu'un plugin n'ait pas besoin de connaitre son propre chemin
-    // d'installation absolu. Un nom seul (ex: "python3", "node") est
-    // cherche tel quel dans PATH.
     let command = if command_raw.contains('/') {
         plugin_dir.join(&command_raw).to_string_lossy().into_owned()
     } else {
@@ -142,12 +107,6 @@ fn parse_manifest(id: &str, plugin_dir: &Path, content: &str) -> Option<PluginMa
     })
 }
 
-/// Charge le manifeste d'un plugin nomme `id`, cherche sous
-/// `<plugins_dir>/<id>/plugin.json`. Retourne `None` si le dossier,
-/// le manifeste, ou son contenu est absent/invalide -- un plugin
-/// active dans la config mais introuvable sur le disque est
-/// silencieusement ignore plutot que de faire planter Cera au
-/// demarrage.
 pub fn load_manifest(plugins_dir: &Path, id: &str) -> Option<PluginManifest> {
     let plugin_dir = plugins_dir.join(id);
     let manifest_path = plugin_dir.join("plugin.json");
@@ -155,10 +114,6 @@ pub fn load_manifest(plugins_dir: &Path, id: &str) -> Option<PluginManifest> {
     parse_manifest(id, &plugin_dir, &content)
 }
 
-/// Charge les manifestes de tous les plugins listes dans `enabled` et
-/// presents sur le disque, dans le meme ordre que `enabled`. Un plugin
-/// active mais introuvable ou dont le manifeste est invalide est
-/// simplement absent du resultat.
 pub fn load_enabled_plugins(plugins_dir: &Path, enabled: &[String]) -> Vec<PluginManifest> {
     enabled
         .iter()

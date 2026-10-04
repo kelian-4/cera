@@ -1,39 +1,18 @@
-//! Analyse des arguments de la ligne de commande de Cera.
-//!
-//! Ce module est volontairement pur : il ne touche ni au terminal ni au
-//! disque, pour etre entierement testable. C'est `main.rs` qui decide quoi
-//! faire de la commande retournee (et qui verifie, par exemple, qu'un
-//! chemin est bien un repertoire).
-//!
-//! Grammaire :
-//! - `cera [fichier...]`          ouvre les fichiers dans l'editeur ;
-//! - `cera -e [dossier] [fichier...]`, `--explorer`
-//!   ouvre l'editeur avec l'explorateur de fichiers a gauche (dossier
-//!   optionnel, repertoire courant par defaut) ;
-//! - `cera -a fichier...`, `--afficher`
-//!   affiche les fichiers dans le terminal, colores, comme `cat`, puis
-//!   quitte (aucun editeur n'est lance) ;
-//! - `--` termine les options : tout ce qui suit est un nom de fichier.
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
-    /// Lance l'editeur. `explorer` vaut `Some(dossier)` si `-e` a ete
-    /// donne (le dossier vaut `"."` quand il n'est pas precise).
     Edit {
         explorer: Option<String>,
         files: Vec<String>,
     },
-    /// Affiche les fichiers comme `cat`, puis quitte.
-    Show { files: Vec<String> },
+    Show {
+        files: Vec<String>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CliError {
-    /// Une option inconnue (ex: `-x`).
     UnknownOption(String),
-    /// `-a` sans aucun fichier a afficher.
     ShowWithoutFile,
-    /// `-a` et `-e` ensemble : un cat non interactif n'a pas d'explorateur.
     ShowAndExplorer,
 }
 
@@ -41,7 +20,6 @@ fn is_option(arg: &str) -> bool {
     arg.len() > 1 && arg.starts_with('-')
 }
 
-/// Analyse les arguments (sans le nom du programme).
 pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
     let mut explorer_requested = false;
     let mut show_requested = false;
@@ -74,9 +52,6 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
     }
 
     if explorer_requested {
-        // Le premier argument positionnel est le dossier a explorer ; les
-        // suivants sont des fichiers a ouvrir. Sans argument : repertoire
-        // courant.
         let mut iter = positional.into_iter();
         let dir = iter.next().unwrap_or_else(|| ".".to_string());
         return Ok(Command::Edit {

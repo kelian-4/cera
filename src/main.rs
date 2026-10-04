@@ -26,10 +26,6 @@ fn describe_cli_error(e: &CliError) -> String {
     }
 }
 
-/// `cera -a fichier...` : affiche chaque fichier colore sur la sortie
-/// standard, comme `cat`, sans jamais ouvrir l'editeur ni toucher au
-/// terminal. S'appuie sur le plugin pretty-cat (son mode `--cat`) ; une
-/// erreur claire est renvoyee s'il n'est pas charge.
 fn run_show(files: &[String]) -> ! {
     let config_path = cera::io::config::default_config_path();
     cera::io::config::ensure_config_file_exists(&config_path);
@@ -70,9 +66,6 @@ fn run_show(files: &[String]) -> ! {
     }
 }
 
-/// `cera [fichier...]` ou `cera -e [dossier] [fichier...]` : lance
-/// l'editeur normalement. Un repertoire passe sans `-e` est une erreur
-/// explicite plutot que d'etre silencieusement mal gere.
 fn run_edit(explorer: Option<String>, files: &[String]) -> ! {
     for f in files {
         if std::path::Path::new(f).is_dir() {
@@ -102,11 +95,6 @@ fn run_edit(explorer: Option<String>, files: &[String]) -> ! {
     editor.run();
 }
 
-/// Affiche l'erreur "c'est un repertoire" et quitte, sans jamais entrer en
-/// mode terminal raw (c'est une erreur de ligne de commande, pas une
-/// erreur en cours d'edition). Le message differe selon que le plugin
-/// file-explorer est charge ou non, pour indiquer la bonne marche a
-/// suivre dans chaque cas.
 fn report_directory_error(path: &str) -> ! {
     let config_path = cera::io::config::default_config_path();
     cera::io::config::ensure_config_file_exists(&config_path);

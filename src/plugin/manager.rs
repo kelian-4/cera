@@ -1,10 +1,3 @@
-//! Lance un plugin en sous-processus et gere l'echange de messages avec
-//! lui (voir `protocol.rs` pour le format des messages). La lecture de la
-//! sortie du plugin est non bloquante : `poll_incoming` ne bloque jamais,
-//! elle retourne immediatement ce qui est disponible (eventuellement
-//! rien), pour que la boucle principale de l'editeur reste reactive
-//! (redimensionnement du terminal, etc.) pendant qu'un plugin tourne.
-
 use super::protocol::{parse_incoming, DisplayMode, IncomingMessage, OutgoingMessage};
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use std::io::{Read, Write};
@@ -13,8 +6,6 @@ use std::process::{Child, Command, Stdio};
 
 pub struct PluginProcess {
     child: Child,
-    /// Reste de la derniere lecture qui ne formait pas encore une ligne
-    /// complete, conserve d'un appel a l'autre de `poll_incoming`.
     pending: String,
 }
 
@@ -32,9 +23,6 @@ impl std::fmt::Display for SpawnError {
 }
 
 impl PluginProcess {
-    /// Lance l'executable `command` (avec ses arguments) comme plugin,
-    /// et lui envoie immediatement le message `init`. `panel_width` n'a
-    /// d'effet que pour `DisplayMode::Panel`.
     #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         command: &str,
@@ -71,9 +59,6 @@ impl PluginProcess {
         Ok(process)
     }
 
-    /// Envoie un message au plugin. Les erreurs d'ecriture sont ignorees
-    /// silencieusement (un plugin qui a deja quitte ne doit pas faire
-    /// planter Cera) ; `is_alive` permet a l'appelant de detecter ce cas.
     pub fn send(&mut self, message: OutgoingMessage) {
         if let Some(stdin) = self.child.stdin.as_mut() {
             let _ = stdin.write_all(message.0.as_bytes());
@@ -82,11 +67,6 @@ impl PluginProcess {
         }
     }
 
-    /// Lit tout ce qui est immediatement disponible sur la sortie du
-    /// plugin, sans jamais bloquer, et retourne les messages complets
-    /// (lignes terminees par '\n') qu'elle a pu decoder. Les lignes qui ne
-    /// sont pas du JSON reconnu sont silencieusement ignorees plutot que
-    /// de faire planter Cera.
     pub fn poll_incoming(&mut self) -> Vec<IncomingMessage> {
         let mut messages = Vec::new();
         let Some(stdout) = self.child.stdout.as_mut() else {
@@ -121,13 +101,10 @@ impl PluginProcess {
         messages
     }
 
-    /// Le processus tourne-t-il encore ? Ne bloque pas.
     pub fn is_alive(&mut self) -> bool {
         matches!(self.child.try_wait(), Ok(None))
     }
 
-    /// Termine le plugin : lui envoie `shutdown`, lui laisse une chance de
-    /// quitter proprement, puis le tue s'il n'a pas quitte de lui-meme.
     pub fn terminate(&mut self) {
         self.send(OutgoingMessage::shutdown());
         for _ in 0..20 {
@@ -153,19 +130,12 @@ fn set_nonblocking(fd: std::os::unix::io::RawFd) {
 mod tests {
     use super::*;
 
-    /// Utilise `cat` comme faux plugin : il renvoie tel quel ce qu'on lui
-    /// envoie sur stdin, ce qui permet de tester le round-trip complet
-    /// (envoi, lecture non bloquante, decoupage en lignes) sans dependre
-    /// d'un vrai plugin externe au depot.
     #[test]
     fn test_spawn_and_roundtrip_with_cat() {
         let mut process =
             PluginProcess::spawn("cat", &[], DisplayMode::Fullscreen, 24, 80, None, &[])
                 .expect("cat devrait exister");
 
-        // Laisse le temps au process de demarrer et de renvoyer le
-        // message "init" que nous venons de lui envoyer (cat le renvoie
-        // tel quel).
         let mut received = Vec::new();
         for _ in 0..50 {
             received.extend(process.poll_incoming());
@@ -175,9 +145,6 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
 
-        // Le message "init" n'est pas un type reconnu par le plugin ->
-        // parse_incoming le classe en Unknown, mais il doit bien avoir ete
-        // recu et decode comme une ligne JSON valide.
         assert!(!received.is_empty(), "aucun message recu de cat");
 
         process.terminate();
@@ -203,9 +170,6 @@ mod tests {
         let mut process =
             PluginProcess::spawn("cat", &[], DisplayMode::Fullscreen, 24, 80, None, &[])
                 .expect("cat");
-        // Ne rien envoyer de plus : poll_incoming doit retourner
-        // immediatement (le test lui-meme a un timeout global via cargo
-        // test, donc un blocage ferait echouer/trainer le test).
         let start = std::time::Instant::now();
         let _ = process.poll_incoming();
         assert!(start.elapsed() < std::time::Duration::from_millis(200));
@@ -215,9 +179,6 @@ mod tests {
 
 #[cfg(test)]
 mod bundled_plugin_tests {
-    //! Tests d'integration des plugins fournis dans le depot (`plugins/`),
-    //! lances comme de vrais sous-processus Python via `PluginProcess`.
-    //! Ignores silencieusement si `python3` n'est pas disponible.
     use super::*;
     use crate::plugin::protocol::{DisplayMode, IncomingMessage, OutgoingMessage};
     use std::path::PathBuf;
@@ -294,7 +255,6 @@ mod bundled_plugin_tests {
             .collect();
         assert!(all_text.contains("def"));
         assert!(all_text.contains("hello"));
-        // "def" est un mot-cle Python : au moins un segment doit etre colore.
         assert!(render
             .iter()
             .flat_map(|l| l.segments.iter())
@@ -339,7 +299,6 @@ mod bundled_plugin_tests {
             .collect();
         assert!(listing.contains("only.txt"));
 
-        // Entree sur l'unique fichier -> demande d'ouverture.
         process.send(OutgoingMessage::key("Enter", true));
         let after = wait_for(&mut process, |m| {
             m.iter()

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Installe les plugins fournis avec Cera dans le repertoire de plugins de
-# l'utilisateur (par defaut ~/.config/cera/plugins, ou $XDG_CONFIG_HOME/cera/plugins
-# si defini), pour qu'ils soient decouverts par l'editeur.
-#
-# Usage : ./plugins/install.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

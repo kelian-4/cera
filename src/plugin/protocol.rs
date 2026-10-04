@@ -1,32 +1,5 @@
-//! Protocole de communication entre Cera et un plugin externe.
-//!
-//! Un plugin est un executable independant, dans n'importe quel langage.
-//! Cera le lance en sous-processus et echange des messages JSON, un par
-//! ligne, sur son entree/sortie standard :
-//!
-//! - Cera -> plugin : `init`, `key`, `click`, `resize`, `focus`, `shutdown`.
-//! - plugin -> Cera : `render` (affiche une vue plein ecran ou un panneau
-//!   lateral, selon le mode annonce dans `init`), `open_file` (demande a
-//!   Cera d'ouvrir un fichier en edition), `status` (message dans la barre
-//!   de statut), `close` (ferme la vue et revient a l'edition).
-//!
-//! Deux modes d'affichage, fixes pour toute la duree de vie du plugin et
-//! annonces une fois dans `init` :
-//! - `fullscreen` : le plugin remplace tout l'ecran (barres de statut et
-//!   d'aide comprises).
-//! - `panel` : le plugin est affiche dans une colonne a gauche de l'ecran,
-//!   l'editeur restant visible et utilisable a droite. Le plugin recoit sa
-//!   largeur disponible dans `init.panel_width`, et peut la faire varier
-//!   d'un rendu a l'autre en incluant son propre `panel_width` dans le
-//!   message `render` (par exemple pour s'adapter a la longueur des noms
-//!   de fichiers affiches).
-//!
-//! Ce fichier ne fait que construire/lire ces messages ; `manager.rs` gere
-//! le sous-processus lui-meme.
-
 use crate::io::json;
 
-/// Echappe une chaine pour l'inserer dans une valeur JSON entre guillemets.
 pub fn json_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     for c in s.chars() {
@@ -58,13 +31,9 @@ impl DisplayMode {
     }
 }
 
-/// Un message Cera -> plugin, deja serialise en une ligne JSON (sans le
-/// retour a la ligne final, ajoute par le manager au moment de l'ecriture).
 pub struct OutgoingMessage(pub String);
 
 impl OutgoingMessage {
-    /// `panel_width` n'est significatif que pour `DisplayMode::Panel` ; il
-    /// est omis du message pour un plugin plein ecran.
     pub fn init(
         mode: DisplayMode,
         screen_rows: usize,
@@ -98,8 +67,6 @@ impl OutgoingMessage {
         ))
     }
 
-    /// Un clic dans un panneau lateral, sur la ligne `row` (0-indexee,
-    /// relative au premier rang de la zone de rendu du plugin).
     pub fn click(row: usize) -> Self {
         Self(format!("{{\"type\":\"click\",\"row\":{}}}", row))
     }
@@ -123,8 +90,6 @@ impl OutgoingMessage {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RenderSegment {
     pub text: String,
-    /// Couleur hex ("#RRGGBB"), ou None pour heriter de la couleur normale
-    /// du theme.
     pub color: Option<u32>,
     pub bold: bool,
 }
@@ -138,8 +103,6 @@ pub struct RenderLine {
 pub enum IncomingMessage {
     Render {
         lines: Vec<RenderLine>,
-        /// Largeur souhaitee par un plugin en mode panneau, si precisee
-        /// dans ce rendu (ignoree pour un plugin plein ecran).
         panel_width: Option<usize>,
     },
     OpenFile {
@@ -150,9 +113,6 @@ pub enum IncomingMessage {
         is_error: bool,
     },
     Close,
-    /// Message reconnu mais dont le contenu n'a pas pu etre interprete, ou
-    /// type de message inconnu : ignore par l'appelant plutot que de
-    /// planter, pour rester tolerant a un plugin partiellement bugue.
     Unknown,
 }
 
@@ -161,10 +121,6 @@ fn parse_hex_color(s: &str) -> Option<u32> {
     u32::from_str_radix(s, 16).ok()
 }
 
-/// Parse une ligne de sortie d'un plugin. Retourne `None` si la ligne
-/// n'est pas un JSON valide (par exemple si le plugin a ecrit un message
-/// de debug par erreur sur sa sortie standard) plutot que de faire
-/// planter Cera.
 pub fn parse_incoming(line: &str) -> Option<IncomingMessage> {
     let trimmed = line.trim();
     if trimmed.is_empty() {

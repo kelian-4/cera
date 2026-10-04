@@ -36,6 +36,7 @@ pub fn short_help_entries(i18n: &crate::i18n::Translations) -> Vec<ShortHelpEntr
         entry("^C", "help.copy"),
         entry("^V", "help.paste"),
         entry("^K", "help.cut_line"),
+        entry("^A", "help.select_all"),
         entry("^L", "help.goto_line"),
         entry("^N", "help.next_file"),
         entry("^P", "help.prev_file"),
@@ -62,6 +63,7 @@ pub fn full_documentation(i18n: &crate::i18n::Translations) -> Vec<HelpCategory>
                 entry("Ctrl-C", "doc.copy"),
                 entry("Ctrl-V", "doc.paste"),
                 entry("Ctrl-K", "doc.cut_line"),
+                entry("Ctrl-A", "doc.select_all"),
             ],
         },
         HelpCategory {

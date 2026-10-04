@@ -22,9 +22,6 @@ pub struct SidePanel {
     manifest_idx: usize,
     lines: Vec<crate::plugin::protocol::RenderLine>,
     width: usize,
-    /// Si `true`, les touches de navigation vont au panneau ; sinon elles
-    /// vont a l'editeur comme d'habitude (seul Ctrl-E et quelques touches
-    /// de gestion du panneau restent actives dans les deux cas).
     focused: bool,
 }
 
@@ -279,6 +276,22 @@ impl Editor {
         if extend_selection {
             ob.selection.active = Position::new(cursor.cy, cursor.cx);
         }
+
+        ob.undo_stack.break_coalescing();
+    }
+
+    fn select_all(&mut self) {
+        let ob = self.buffer_manager.active_mut();
+        let num_rows = ob.buffer.num_rows();
+        let last_row = num_rows.saturating_sub(1);
+        let last_col = ob.buffer.row(last_row).size();
+
+        ob.selection.is_active = true;
+        ob.selection.anchor = Position::new(0, 0);
+        ob.selection.active = Position::new(last_row, last_col);
+
+        ob.cursor.cy = last_row;
+        ob.cursor.cx = last_col;
 
         ob.undo_stack.break_coalescing();
     }
@@ -1093,14 +1106,9 @@ impl Editor {
                 self.quit_times = self.config.quit_times;
                 return;
             }
-            // Toute autre touche est ignoree : c'est une vraie confirmation
-            // modale, le bandeau reste affiche tant que Ctrl-Q ou Echap
-            // n'a pas ete presse.
         }
     }
 
-    /// Convertit un raccourci de manifeste ("^E") en code touche Ctrl
-    /// correspondant, si le format est reconnu.
     fn shortcut_to_key_code(shortcut: &str) -> Option<i32> {
         let mut chars = shortcut.chars();
         if chars.next()? != '^' {
@@ -1123,9 +1131,6 @@ impl Editor {
             .position(|m| m.shortcut.as_deref().and_then(Self::shortcut_to_key_code) == Some(key))
     }
 
-    /// Raccourci de secours (Ctrl-G) : lance directement l'unique plugin
-    /// actif, affiche la liste des plugins disponibles s'il y en a
-    /// plusieurs, ou signale qu'aucun plugin n'est actif.
     fn open_plugin_palette(&mut self) {
         match self.plugin_manifests.len() {
             0 => {
@@ -1175,20 +1180,6 @@ impl Editor {
         Some(name.to_string())
     }
 
-    /// Lance le plugin d'indice `manifest_idx` (dans `self.plugin_manifests`)
-    /// et prend le controle de l'ecran/clavier jusqu'a ce que le plugin
-    /// ferme sa vue (message `close`), demande a ouvrir un fichier
-    /// (`open_file`), ou que l'utilisateur appuie sur Echap. Le
-    /// sous-processus est toujours termine proprement avant de revenir a
-    /// l'edition normale, quel que soit le chemin de sortie.
-    /// Lance en plein ecran le plugin d'indice `manifest_idx` (dans
-    /// `self.plugin_manifests`) et prend le controle de l'ecran/clavier
-    /// jusqu'a ce que le plugin ferme sa vue (message `close`), demande a
-    /// ouvrir un fichier (`open_file`), ou que l'utilisateur appuie sur
-    /// Echap. Le sous-processus est toujours termine proprement avant de
-    /// revenir a l'edition normale, quel que soit le chemin de sortie.
-    /// Ignore silencieusement un plugin declare en mode panneau : c'est
-    /// `toggle_side_panel` qu'il faut appeler pour ceux-la.
     fn run_plugin(&mut self, manifest_idx: usize) {
         let Some(manifest) = self.plugin_manifests.get(manifest_idx).cloned() else {
             return;
@@ -1222,10 +1213,6 @@ impl Editor {
         self.plugin_view = Some(Vec::new());
         let mut last_rows = self.screenrows;
         let mut last_cols = self.screencols;
-        // On ne redessine l'ecran que lorsque quelque chose a change
-        // (nouveau rendu du plugin, message de statut, redimensionnement) :
-        // read_key() ne bloque pas, donc sans ce drapeau la boucle
-        // redessinerait l'ecran complet des milliers de fois par seconde.
         let mut needs_redraw = true;
 
         loop {
@@ -1296,17 +1283,11 @@ impl Editor {
                     ));
                 }
             } else if !needs_redraw {
-                // Rien a faire ce tour-ci : cede brievement le CPU au lieu
-                // de tourner a vide en attendant une touche ou un message
-                // du plugin.
                 std::thread::sleep(std::time::Duration::from_millis(2));
             }
         }
     }
 
-    /// Le fichier actuellement ouvert, ou le repertoire courant si aucun
-    /// fichier n'est ouvert : c'est l'argument runtime transmis a un
-    /// plugin plein ecran a son lancement.
     fn current_file_or_dir_arg(&self) -> String {
         self.buffer_manager
             .active()
@@ -1323,9 +1304,6 @@ impl Editor {
 
     const SIDE_PANEL_WIDTH: usize = 30;
 
-    /// Ouvre le panneau lateral avec le plugin d'indice `manifest_idx` s'il
-    /// n'est pas deja ouvert ; sinon bascule le focus entre le panneau et
-    /// l'editeur ; Ctrl-E sur le panneau deja ouvert et focalise le ferme.
     fn toggle_side_panel(&mut self, manifest_idx: usize) {
         if let Some(panel) = &mut self.side_panel {
             if panel.manifest_idx == manifest_idx {
@@ -1339,7 +1317,6 @@ impl Editor {
                 }
                 return;
             }
-            // Un autre plugin panneau est deja ouvert : on le remplace.
             self.close_side_panel();
         }
 
@@ -1347,10 +1324,6 @@ impl Editor {
         self.open_side_panel_with_arg(manifest_idx, runtime_arg);
     }
 
-    /// Variante de `toggle_side_panel` pour un lancement explicite avec un
-    /// chemin donne (utilisee par `-e [dossier]` en ligne de commande).
-    /// Remplace un panneau deja ouvert plutot que de basculer son focus :
-    /// `-e` demande toujours a explorer ce dossier precis.
     pub fn open_explorer_on(&mut self, dir: &str) -> Result<(), String> {
         let idx = self
             .plugin_manifests
@@ -1403,10 +1376,6 @@ impl Editor {
         }
     }
 
-    /// A appeler a chaque tour de la boucle principale : lit sans bloquer
-    /// les messages en attente du plugin du panneau lateral (s'il y en a
-    /// un) et les applique. Ferme le panneau si le plugin s'est termine ou
-    /// a demande sa propre fermeture.
     fn poll_side_panel(&mut self) {
         let Some(panel) = &mut self.side_panel else {
             return;
@@ -1468,10 +1437,6 @@ impl Editor {
         self.side_panel.as_ref().is_some_and(|p| p.focused)
     }
 
-    /// Un clic dans le panneau lateral lui donne le focus et lui transmet
-    /// la ligne cliquee, pour qu'il puisse deplacer sa propre selection
-    /// dessus (le plugin sait, lui, a quelle entree correspond cette ligne
-    /// apres defilement).
     fn click_side_panel_row(&mut self, row: usize) {
         if let Some(panel) = &mut self.side_panel {
             if !panel.focused {
@@ -1486,18 +1451,9 @@ impl Editor {
         }
     }
 
-    /// Transmet une touche au plugin du panneau lateral. Echap rend le
-    /// focus a l'editeur plutot que de fermer le panneau (fermer se fait
-    /// via Ctrl-E), pour rester coherent avec le reste de Cera ou Echap
-    /// annule une action en cours sans jamais fermer une fenetre entiere.
     fn forward_key_to_side_panel(&mut self, key: i32) {
         if key == 0x1b {
-            if let Some(panel) = &mut self.side_panel {
-                panel.focused = false;
-                panel
-                    .process
-                    .send(crate::plugin::protocol::OutgoingMessage::focus(false));
-            }
+            self.unfocus_side_panel();
             return;
         }
         let Some(key_name) = Self::key_code_to_plugin_key_name(key) else {
@@ -1509,6 +1465,15 @@ impl Editor {
                 .send(crate::plugin::protocol::OutgoingMessage::key(
                     &key_name, true,
                 ));
+        }
+    }
+
+    fn unfocus_side_panel(&mut self) {
+        if let Some(panel) = &mut self.side_panel {
+            panel.focused = false;
+            panel
+                .process
+                .send(crate::plugin::protocol::OutgoingMessage::focus(false));
         }
     }
 
@@ -1846,7 +1811,7 @@ impl Editor {
             return;
         }
 
-        let tab_bar_height = if self.buffer_manager.count() > 1 {
+        let tab_bar_height = if self.buffer_manager.count() > 1 || self.side_panel.is_some() {
             1
         } else {
             0
@@ -1863,10 +1828,17 @@ impl Editor {
                 }
                 return;
             }
+            if panel.focused && ev.pressed {
+                self.unfocus_side_panel();
+            }
         }
 
-        if tab_bar_height > 0 && ev.y == 0 && ev.pressed && !ev.is_drag {
-            let mut col = 0i32;
+        if self.buffer_manager.count() > 1 && ev.y == 0 && ev.pressed && !ev.is_drag {
+            let mut col = self
+                .side_panel
+                .as_ref()
+                .map(|p| p.width as i32 + 1)
+                .unwrap_or(0);
             for i in 0..self.buffer_manager.count() {
                 let other = self.buffer_manager.at(i);
                 let mut name = other.buffer.filename().unwrap_or("[Sans nom]").to_string();
@@ -1998,6 +1970,7 @@ impl Editor {
             k if k == ctrl('d') => self.toggle_full_doc(),
             k if k == ctrl('k') => self.cut_current_line(),
             k if k == ctrl('g') => self.open_plugin_palette(),
+            k if k == ctrl('a') => self.select_all(),
 
             k if self.plugin_shortcut_matches(k) => {
                 if let Some(idx) = self.plugin_index_for_shortcut(k) {
