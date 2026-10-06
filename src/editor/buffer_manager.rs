@@ -70,7 +70,28 @@ impl BufferManager {
         self.active_index
     }
 
+    fn find_open_buffer(&self, filename: &str) -> Option<usize> {
+        let target_canonical = std::fs::canonicalize(filename).ok();
+        self.buffers.iter().position(|b| {
+            let Some(open_name) = b.buffer.filename() else {
+                return false;
+            };
+            if open_name == filename {
+                return true;
+            }
+            match (&target_canonical, std::fs::canonicalize(open_name).ok()) {
+                (Some(t), Some(o)) => *t == o,
+                _ => false,
+            }
+        })
+    }
+
     pub fn open_file(&mut self, filename: &str, syntax_db: &[Syntax]) -> usize {
+        if let Some(existing_idx) = self.find_open_buffer(filename) {
+            self.active_index = existing_idx;
+            return existing_idx;
+        }
+
         let reuse_first = self.buffers.len() == 1
             && self.buffers[0].buffer.filename().is_none()
             && !self.buffers[0].buffer.dirty();
@@ -177,6 +198,41 @@ mod tests {
         mgr.close_active();
         assert_eq!(mgr.count(), 1);
         assert_eq!(mgr.active().buffer.filename(), Some(path2));
+
+        let _ = std::fs::remove_file(path1);
+        let _ = std::fs::remove_file(path2);
+    }
+
+    #[test]
+    fn test_open_file_reuses_existing_buffer_instead_of_duplicating() {
+        let path1 = "/tmp/cera_rust_bm_test_dup1.c";
+        let path2 = "/tmp/cera_rust_bm_test_dup2.c";
+        std::fs::write(path1, "int a;\n").unwrap();
+        std::fs::write(path2, "int b;\n").unwrap();
+
+        let db = crate::syntax::build_database();
+        let mut mgr = BufferManager::new();
+
+        mgr.open_file(path1, &db);
+        mgr.open_file(path2, &db);
+        assert_eq!(mgr.count(), 2);
+
+        mgr.open_file(path1, &db);
+        assert_eq!(
+            mgr.count(),
+            2,
+            "ouvrir un fichier deja ouvert ne doit pas creer un nouvel onglet"
+        );
+        assert_eq!(mgr.active_index(), 0);
+        assert_eq!(mgr.active().buffer.filename(), Some(path1));
+
+        mgr.open_file(path1, &db);
+        mgr.open_file(path1, &db);
+        assert_eq!(
+            mgr.count(),
+            2,
+            "re-ouvrir plusieurs fois le meme fichier ne doit jamais dupliquer l'onglet"
+        );
 
         let _ = std::fs::remove_file(path1);
         let _ = std::fs::remove_file(path2);

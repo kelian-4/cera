@@ -177,6 +177,8 @@ fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
         return;
     }
 
+    let tabs_width = state.screencols.saturating_sub(side_panel_width(state));
+
     if let Some((panel_lines, width, _)) = state.side_panel {
         draw_panel_row(ab, state, panel_lines, 0, width);
     }
@@ -203,13 +205,13 @@ fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
     }
 
     let line_chars: Vec<char> = line.chars().collect();
-    let truncated: String = if line_chars.len() > state.screencols {
-        line_chars[..state.screencols].iter().collect()
+    let truncated: String = if line_chars.len() > tabs_width {
+        line_chars[..tabs_width].iter().collect()
     } else {
         line
     };
     ab.append(&truncated);
-    for _ in truncated.chars().count()..state.screencols {
+    for _ in truncated.chars().count()..tabs_width {
         ab.append(" ");
     }
     ab.append("\r\n");

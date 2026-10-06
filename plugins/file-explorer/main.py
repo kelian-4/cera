@@ -169,7 +169,7 @@ def main():
             render(explorer, screen_rows, screen_cols, focused)
         elif msg_type == "click":
             row = msg.get("row", 0)
-            idx = explorer.scroll_top + row - 1
+            idx = explorer.scroll_top + row
             if 0 <= idx < len(explorer.nodes):
                 explorer.selected = idx
                 opened = explorer.toggle_or_open()

@@ -196,6 +196,16 @@ impl Terminal {
         Ok((rows, cols))
     }
 
+    fn read_byte_after_escape(&self) -> io::Result<Option<u8>> {
+        for _ in 0..20 {
+            if let Some(b) = self.read_byte_raw()? {
+                return Ok(Some(b));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        Ok(None)
+    }
+
     pub fn read_key(&mut self) -> io::Result<i32> {
         let first = match self.read_byte_raw()? {
             Some(b) => b,
@@ -203,11 +213,11 @@ impl Terminal {
         };
 
         if first == 0x1b {
-            let seq0 = match self.read_byte_raw()? {
+            let seq0 = match self.read_byte_after_escape()? {
                 Some(b) => b,
                 None => return Ok(0x1b),
             };
-            let seq1 = match self.read_byte_raw()? {
+            let seq1 = match self.read_byte_after_escape()? {
                 Some(b) => b,
                 None => return Ok(0x1b),
             };
