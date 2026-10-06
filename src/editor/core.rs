@@ -17,6 +17,14 @@ fn ctrl(c: char) -> i32 {
     (c as i32) & 0x1f
 }
 
+pub struct SidePanel {
+    process: crate::plugin::manager::PluginProcess,
+    manifest_idx: usize,
+    lines: Vec<crate::plugin::protocol::RenderLine>,
+    width: usize,
+    focused: bool,
+}
+
 pub struct Editor {
     terminal: Terminal,
     buffer_manager: BufferManager,
@@ -24,6 +32,8 @@ pub struct Editor {
     clipboard: Clipboard,
     config: Config,
     i18n: crate::i18n::Translations,
+    plugin_manifests: Vec<crate::plugin::registry::PluginManifest>,
+    side_panel: Option<SidePanel>,
 
     screenrows: usize,
     screencols: usize,
@@ -38,6 +48,7 @@ pub struct Editor {
     help_active: bool,
     prompt_text: Option<String>,
     prompt_cursor_offset: Option<usize>,
+    plugin_view: Option<Vec<crate::plugin::protocol::RenderLine>>,
 
     search_active: bool,
     search_term: String,
@@ -64,6 +75,12 @@ impl Editor {
         let syntax_db = syntax::build_database();
         let buffer_manager = BufferManager::new();
         let i18n = crate::i18n::load(config.language.as_deref());
+        let plugin_manifests =
+            crate::plugin::registry::plugins_directory(config.plugins_directory.as_deref())
+                .map(|dir| {
+                    crate::plugin::registry::load_enabled_plugins(&dir, &config.plugins_enabled)
+                })
+                .unwrap_or_default();
 
         Ok(Editor {
             terminal,
@@ -73,6 +90,8 @@ impl Editor {
             quit_times: config.quit_times,
             config,
             i18n,
+            plugin_manifests,
+            side_panel: None,
             screenrows: rows as usize,
             screencols: cols as usize,
             status_message: String::new(),
@@ -82,6 +101,7 @@ impl Editor {
             help_active: false,
             prompt_text: None,
             prompt_cursor_offset: None,
+            plugin_view: None,
             search_active: false,
             search_term: String::new(),
             search_cursor: 0,
@@ -109,6 +129,14 @@ impl Editor {
             if let Ok((rows, cols)) = self.terminal.get_window_size() {
                 self.screenrows = rows as usize;
                 self.screencols = cols as usize;
+                if let Some(panel) = &mut self.side_panel {
+                    panel
+                        .process
+                        .send(crate::plugin::protocol::OutgoingMessage::resize(
+                            self.screenrows,
+                            self.screencols,
+                        ));
+                }
             }
         }
     }
@@ -133,6 +161,11 @@ impl Editor {
             search_cursor: self.search_cursor,
             config: &self.config,
             i18n: &self.i18n,
+            plugin_view: self.plugin_view.as_deref(),
+            side_panel: self
+                .side_panel
+                .as_ref()
+                .map(|p| (p.lines.as_slice(), p.width, p.focused)),
         }
     }
 
@@ -140,8 +173,7 @@ impl Editor {
         let search = SearchDisplayInfo::default();
         let state = self.build_view_state(search);
         let text_rows = screen_renderer::text_area_screen_rows(&state);
-        let gutter = screen_renderer::gutter_width(&state);
-        let text_cols = self.screencols.saturating_sub(gutter);
+        let text_cols = screen_renderer::text_area_screen_cols(&state);
 
         let ob = self.buffer_manager.active_mut();
 
@@ -181,6 +213,7 @@ impl Editor {
 
     pub fn run(&mut self) -> ! {
         loop {
+            self.poll_side_panel();
             self.refresh_screen();
             self.process_keypress();
         }
@@ -243,6 +276,22 @@ impl Editor {
         if extend_selection {
             ob.selection.active = Position::new(cursor.cy, cursor.cx);
         }
+
+        ob.undo_stack.break_coalescing();
+    }
+
+    fn select_all(&mut self) {
+        let ob = self.buffer_manager.active_mut();
+        let num_rows = ob.buffer.num_rows();
+        let last_row = num_rows.saturating_sub(1);
+        let last_col = ob.buffer.row(last_row).size();
+
+        ob.selection.is_active = true;
+        ob.selection.anchor = Position::new(0, 0);
+        ob.selection.active = Position::new(last_row, last_col);
+
+        ob.cursor.cy = last_row;
+        ob.cursor.cx = last_col;
 
         ob.undo_stack.break_coalescing();
     }
@@ -1057,9 +1106,374 @@ impl Editor {
                 self.quit_times = self.config.quit_times;
                 return;
             }
-            // Toute autre touche est ignoree : c'est une vraie confirmation
-            // modale, le bandeau reste affiche tant que Ctrl-Q ou Echap
-            // n'a pas ete presse.
+        }
+    }
+
+    fn shortcut_to_key_code(shortcut: &str) -> Option<i32> {
+        let mut chars = shortcut.chars();
+        if chars.next()? != '^' {
+            return None;
+        }
+        let letter = chars.next()?;
+        if chars.next().is_some() {
+            return None;
+        }
+        Some(ctrl(letter.to_ascii_lowercase()))
+    }
+
+    fn plugin_shortcut_matches(&self, key: i32) -> bool {
+        self.plugin_index_for_shortcut(key).is_some()
+    }
+
+    fn plugin_index_for_shortcut(&self, key: i32) -> Option<usize> {
+        self.plugin_manifests
+            .iter()
+            .position(|m| m.shortcut.as_deref().and_then(Self::shortcut_to_key_code) == Some(key))
+    }
+
+    fn open_plugin_palette(&mut self) {
+        match self.plugin_manifests.len() {
+            0 => {
+                let msg = self.i18n.t("status.no_plugins_active");
+                self.set_status_message(msg);
+            }
+            1 => self.run_plugin(0),
+            _ => {
+                let names: Vec<String> = self
+                    .plugin_manifests
+                    .iter()
+                    .enumerate()
+                    .map(|(i, m)| {
+                        let shortcut = m.shortcut.clone().unwrap_or_default();
+                        format!("{}:{} {}", i + 1, m.name, shortcut)
+                    })
+                    .collect();
+                self.set_status_message(names.join("  "));
+            }
+        }
+    }
+
+    fn key_code_to_plugin_key_name(code: i32) -> Option<String> {
+        use crate::terminal::*;
+        let name = match code {
+            ARROW_UP => "Up",
+            ARROW_DOWN => "Down",
+            ARROW_LEFT => "Left",
+            ARROW_RIGHT => "Right",
+            PAGE_UP => "PageUp",
+            PAGE_DOWN => "PageDown",
+            HOME_KEY => "Home",
+            END_KEY => "End",
+            DEL_KEY => "Delete",
+            BACKSPACE => "Backspace",
+            0x1b => "Escape",
+            0x0d => "Enter",
+            0x09 => "Tab",
+            c if (0x20..0x7f).contains(&c) => {
+                return Some((c as u8 as char).to_string());
+            }
+            c if is_encoded_codepoint(c) => {
+                return Some(decode_codepoint(c).to_string());
+            }
+            _ => return None,
+        };
+        Some(name.to_string())
+    }
+
+    fn run_plugin(&mut self, manifest_idx: usize) {
+        let Some(manifest) = self.plugin_manifests.get(manifest_idx).cloned() else {
+            return;
+        };
+        if manifest.mode == crate::plugin::protocol::DisplayMode::Panel {
+            self.toggle_side_panel(manifest_idx);
+            return;
+        }
+
+        let runtime_arg = self.current_file_or_dir_arg();
+
+        let mut process = match crate::plugin::manager::PluginProcess::spawn(
+            &manifest.command,
+            &manifest.args,
+            crate::plugin::protocol::DisplayMode::Fullscreen,
+            self.screenrows,
+            self.screencols,
+            None,
+            &[runtime_arg],
+        ) {
+            Ok(p) => p,
+            Err(_) => {
+                let msg = self
+                    .i18n
+                    .t1("status.plugin_failed_to_start", &manifest.name);
+                self.set_status_message_kind(msg, MessageKind::Error);
+                return;
+            }
+        };
+
+        self.plugin_view = Some(Vec::new());
+        let mut last_rows = self.screenrows;
+        let mut last_cols = self.screencols;
+        let mut needs_redraw = true;
+
+        loop {
+            for message in process.poll_incoming() {
+                match message {
+                    crate::plugin::protocol::IncomingMessage::Render { lines, .. } => {
+                        self.plugin_view = Some(lines);
+                        needs_redraw = true;
+                    }
+                    crate::plugin::protocol::IncomingMessage::Status { message, is_error } => {
+                        let kind = if is_error {
+                            MessageKind::Error
+                        } else {
+                            MessageKind::Info
+                        };
+                        self.set_status_message_kind(message, kind);
+                        needs_redraw = true;
+                    }
+                    crate::plugin::protocol::IncomingMessage::OpenFile { path } => {
+                        process.terminate();
+                        self.plugin_view = None;
+                        self.open_file(&path);
+                        return;
+                    }
+                    crate::plugin::protocol::IncomingMessage::Close => {
+                        process.terminate();
+                        self.plugin_view = None;
+                        return;
+                    }
+                    crate::plugin::protocol::IncomingMessage::Unknown => {}
+                }
+            }
+
+            if !process.is_alive() {
+                self.plugin_view = None;
+                let msg = self.i18n.t1("status.plugin_exited", &manifest.name);
+                self.set_status_message_kind(msg, MessageKind::Error);
+                return;
+            }
+
+            if needs_redraw {
+                self.refresh_screen();
+                needs_redraw = false;
+            }
+
+            let key = self.terminal.read_key().unwrap_or(terminal::NO_KEY);
+
+            self.apply_resize_if_needed();
+            if self.screenrows != last_rows || self.screencols != last_cols {
+                last_rows = self.screenrows;
+                last_cols = self.screencols;
+                process.send(crate::plugin::protocol::OutgoingMessage::resize(
+                    last_rows, last_cols,
+                ));
+                needs_redraw = true;
+            }
+
+            if key == 0x1b {
+                process.terminate();
+                self.plugin_view = None;
+                return;
+            }
+
+            if key != terminal::NO_KEY {
+                if let Some(key_name) = Self::key_code_to_plugin_key_name(key) {
+                    process.send(crate::plugin::protocol::OutgoingMessage::key(
+                        &key_name, true,
+                    ));
+                }
+            } else if !needs_redraw {
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+        }
+    }
+
+    fn current_file_or_dir_arg(&self) -> String {
+        self.buffer_manager
+            .active()
+            .buffer
+            .filename()
+            .map(|s| s.to_string())
+            .or_else(|| {
+                std::env::current_dir()
+                    .ok()
+                    .map(|p| p.to_string_lossy().into_owned())
+            })
+            .unwrap_or_default()
+    }
+
+    const SIDE_PANEL_WIDTH: usize = 30;
+
+    fn toggle_side_panel(&mut self, manifest_idx: usize) {
+        if let Some(panel) = &mut self.side_panel {
+            if panel.manifest_idx == manifest_idx {
+                if panel.focused {
+                    self.close_side_panel();
+                } else {
+                    panel.focused = true;
+                    panel
+                        .process
+                        .send(crate::plugin::protocol::OutgoingMessage::focus(true));
+                }
+                return;
+            }
+            self.close_side_panel();
+        }
+
+        let runtime_arg = self.current_file_or_dir_arg();
+        self.open_side_panel_with_arg(manifest_idx, runtime_arg);
+    }
+
+    pub fn open_explorer_on(&mut self, dir: &str) -> Result<(), String> {
+        let idx = self
+            .plugin_manifests
+            .iter()
+            .position(|m| m.mode == crate::plugin::protocol::DisplayMode::Panel);
+        let Some(idx) = idx else {
+            return Err(self.i18n.t("cli.explorer_plugin_not_loaded"));
+        };
+        self.close_side_panel();
+        self.open_side_panel_with_arg(idx, dir.to_string());
+        Ok(())
+    }
+
+    fn open_side_panel_with_arg(&mut self, manifest_idx: usize, runtime_arg: String) {
+        let Some(manifest) = self.plugin_manifests.get(manifest_idx).cloned() else {
+            return;
+        };
+        let width = Self::SIDE_PANEL_WIDTH.min(self.screencols.saturating_sub(10).max(10));
+
+        match crate::plugin::manager::PluginProcess::spawn(
+            &manifest.command,
+            &manifest.args,
+            crate::plugin::protocol::DisplayMode::Panel,
+            self.screenrows,
+            self.screencols,
+            Some(width),
+            &[runtime_arg],
+        ) {
+            Ok(process) => {
+                self.side_panel = Some(SidePanel {
+                    process,
+                    manifest_idx,
+                    lines: Vec::new(),
+                    width,
+                    focused: true,
+                });
+            }
+            Err(_) => {
+                let msg = self
+                    .i18n
+                    .t1("status.plugin_failed_to_start", &manifest.name);
+                self.set_status_message_kind(msg, MessageKind::Error);
+            }
+        }
+    }
+
+    fn close_side_panel(&mut self) {
+        if let Some(mut panel) = self.side_panel.take() {
+            panel.process.terminate();
+        }
+    }
+
+    fn poll_side_panel(&mut self) {
+        let Some(panel) = &mut self.side_panel else {
+            return;
+        };
+        let messages = panel.process.poll_incoming();
+
+        for message in messages {
+            match message {
+                crate::plugin::protocol::IncomingMessage::Render { lines, panel_width } => {
+                    let max_width = self.screencols.saturating_sub(10).max(10);
+                    if let Some(panel) = &mut self.side_panel {
+                        panel.lines = lines;
+                        if let Some(w) = panel_width {
+                            panel.width = w.clamp(10, max_width);
+                        }
+                    }
+                }
+                crate::plugin::protocol::IncomingMessage::Status { message, is_error } => {
+                    let kind = if is_error {
+                        MessageKind::Error
+                    } else {
+                        MessageKind::Info
+                    };
+                    self.set_status_message_kind(message, kind);
+                }
+                crate::plugin::protocol::IncomingMessage::OpenFile { path } => {
+                    self.open_file(&path);
+                    if let Some(panel) = &mut self.side_panel {
+                        panel.focused = false;
+                        panel
+                            .process
+                            .send(crate::plugin::protocol::OutgoingMessage::focus(false));
+                    }
+                }
+                crate::plugin::protocol::IncomingMessage::Close => {
+                    self.close_side_panel();
+                    return;
+                }
+                crate::plugin::protocol::IncomingMessage::Unknown => {}
+            }
+        }
+
+        if let Some(panel) = &mut self.side_panel {
+            if !panel.process.is_alive() {
+                let msg = self
+                    .plugin_manifests
+                    .get(panel.manifest_idx)
+                    .map(|m| m.name.clone());
+                self.close_side_panel();
+                if let Some(name) = msg {
+                    let text = self.i18n.t1("status.plugin_exited", &name);
+                    self.set_status_message_kind(text, MessageKind::Error);
+                }
+            }
+        }
+    }
+
+    fn side_panel_has_focus(&self) -> bool {
+        self.side_panel.as_ref().is_some_and(|p| p.focused)
+    }
+
+    fn click_side_panel_row(&mut self, row: usize) {
+        if let Some(panel) = &mut self.side_panel {
+            if !panel.focused {
+                panel.focused = true;
+                panel
+                    .process
+                    .send(crate::plugin::protocol::OutgoingMessage::focus(true));
+            }
+            panel
+                .process
+                .send(crate::plugin::protocol::OutgoingMessage::click(row));
+        }
+    }
+
+    fn forward_key_to_side_panel(&mut self, key: i32) {
+        if key == 0x1b {
+            self.unfocus_side_panel();
+            return;
+        }
+        let Some(key_name) = Self::key_code_to_plugin_key_name(key) else {
+            return;
+        };
+        if let Some(panel) = &mut self.side_panel {
+            panel
+                .process
+                .send(crate::plugin::protocol::OutgoingMessage::key(
+                    &key_name, true,
+                ));
+        }
+    }
+
+    fn unfocus_side_panel(&mut self) {
+        if let Some(panel) = &mut self.side_panel {
+            panel.focused = false;
+            panel
+                .process
+                .send(crate::plugin::protocol::OutgoingMessage::focus(false));
         }
     }
 
@@ -1397,14 +1811,34 @@ impl Editor {
             return;
         }
 
-        let tab_bar_height = if self.buffer_manager.count() > 1 {
+        let tab_bar_height = if self.buffer_manager.count() > 1 || self.side_panel.is_some() {
             1
         } else {
             0
         };
 
-        if tab_bar_height > 0 && ev.y == 0 && ev.pressed && !ev.is_drag {
-            let mut col = 0i32;
+        if let Some(panel) = &self.side_panel {
+            let panel_width = panel.width as i32;
+            if ev.x < panel_width {
+                if ev.pressed && !ev.is_drag {
+                    let row = ev.y - tab_bar_height;
+                    if row >= 0 {
+                        self.click_side_panel_row(row as usize);
+                    }
+                }
+                return;
+            }
+            if panel.focused && ev.pressed {
+                self.unfocus_side_panel();
+            }
+        }
+
+        if self.buffer_manager.count() > 1 && ev.y == 0 && ev.pressed && !ev.is_drag {
+            let mut col = self
+                .side_panel
+                .as_ref()
+                .map(|p| p.width as i32 + 1)
+                .unwrap_or(0);
             for i in 0..self.buffer_manager.count() {
                 let other = self.buffer_manager.at(i);
                 let mut name = other.buffer.filename().unwrap_or("[Sans nom]").to_string();
@@ -1429,9 +1863,10 @@ impl Editor {
         let search = SearchDisplayInfo::default();
         let state = self.build_view_state(search);
         let gutter = screen_renderer::gutter_width(&state) as i32;
+        let panel_width = screen_renderer::side_panel_width(&state) as i32;
 
         let screen_row = ev.y - tab_bar_height;
-        let mut screen_col = ev.x - gutter;
+        let mut screen_col = ev.x - panel_width - gutter;
         if screen_row < 0 {
             return;
         }
@@ -1503,6 +1938,11 @@ impl Editor {
             return;
         }
 
+        if self.side_panel_has_focus() && !self.plugin_shortcut_matches(c) && c != ctrl('q') {
+            self.forward_key_to_side_panel(c);
+            return;
+        }
+
         match c {
             0x0d => self.insert_newline(),
 
@@ -1529,6 +1969,14 @@ impl Editor {
             k if k == ctrl('h') => self.toggle_help(),
             k if k == ctrl('d') => self.toggle_full_doc(),
             k if k == ctrl('k') => self.cut_current_line(),
+            k if k == ctrl('g') => self.open_plugin_palette(),
+            k if k == ctrl('a') => self.select_all(),
+
+            k if self.plugin_shortcut_matches(k) => {
+                if let Some(idx) = self.plugin_index_for_shortcut(k) {
+                    self.run_plugin(idx);
+                }
+            }
 
             terminal::HOME_KEY => {
                 let ob = self.buffer_manager.active_mut();

@@ -29,6 +29,8 @@ pub struct ViewState<'a> {
     pub search_cursor: usize,
     pub config: &'a Config,
     pub i18n: &'a crate::i18n::Translations,
+    pub plugin_view: Option<&'a [crate::plugin::protocol::RenderLine]>,
+    pub side_panel: Option<(&'a [crate::plugin::protocol::RenderLine], usize, bool)>,
 }
 
 pub struct AppendBuffer {
@@ -71,10 +73,6 @@ fn digit_count(n: usize) -> usize {
     }
 }
 
-/// Decoupe `text` en au plus 2 lignes d'au plus `width` caracteres chacune,
-/// en coupant sur une limite de mot (espace) quand c'est possible. Si un
-/// seul mot depasse `width`, il est coupe durement. Le texte au-dela de ce
-/// que 2 lignes de `width` peuvent contenir est tronque.
 pub fn wrap_message_two_lines(text: &str, width: usize) -> (String, Option<String>) {
     if width == 0 {
         return (String::new(), None);
@@ -86,7 +84,6 @@ pub fn wrap_message_two_lines(text: &str, width: usize) -> (String, Option<Strin
 
     let chars: Vec<char> = text.chars().collect();
 
-    // Cherche la derniere limite de mot (espace) a l'interieur de `width`.
     let mut split_at = width;
     if let Some(last_space) = chars[..width].iter().rposition(|&c| c == ' ') {
         if last_space > 0 {
@@ -115,20 +112,34 @@ pub fn gutter_width(state: &ViewState) -> usize {
     digit_count(buf.num_rows().max(1)) + 2
 }
 
-pub fn text_area_screen_rows(state: &ViewState) -> usize {
-    let mut reserved = status_bar_rows(state) + message_bar_rows(state);
-    if state.buffer_manager.count() > 1 {
-        reserved += 1;
+pub fn side_panel_width(state: &ViewState) -> usize {
+    state.side_panel.map(|(_, width, _)| width + 1).unwrap_or(0)
+}
+
+pub fn text_area_screen_cols(state: &ViewState) -> usize {
+    state
+        .screencols
+        .saturating_sub(gutter_width(state))
+        .saturating_sub(side_panel_width(state))
+        .max(1)
+}
+
+pub fn tab_bar_height(state: &ViewState) -> usize {
+    if state.buffer_manager.count() > 1 || state.side_panel.is_some() {
+        1
+    } else {
+        0
     }
+}
+
+pub fn text_area_screen_rows(state: &ViewState) -> usize {
+    let mut reserved = status_bar_rows(state) + message_bar_rows(state) + tab_bar_height(state);
     if state.help_active {
         reserved += 2;
     }
     state.screenrows.saturating_sub(reserved).max(1)
 }
 
-/// Nombre de lignes que prendra la barre de statut (prompt ou barre normale).
-/// La barre de statut normale tient toujours sur 1 ligne (contenu structure,
-/// jamais coupe). Seul un `prompt_text` long peut necessiter 2 lignes.
 fn status_bar_rows(state: &ViewState) -> usize {
     match &state.prompt_text {
         Some(prompt_text) => {
@@ -144,8 +155,6 @@ fn status_bar_rows(state: &ViewState) -> usize {
     }
 }
 
-/// Nombre de lignes que prendra la barre de message (succes/erreur), 0 si
-/// aucun message n'est actuellement affiche.
 fn message_bar_rows(state: &ViewState) -> usize {
     if state.status_message.is_empty() || state.status_message_age_seconds >= 5 {
         return 1;
@@ -160,7 +169,18 @@ fn message_bar_rows(state: &ViewState) -> usize {
 
 fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
     if state.buffer_manager.count() <= 1 {
+        if let Some((panel_lines, width, _)) = state.side_panel {
+            draw_panel_row(ab, state, panel_lines, 0, width);
+            ab.append("\x1b[K");
+            ab.append("\r\n");
+        }
         return;
+    }
+
+    let tabs_width = state.screencols.saturating_sub(side_panel_width(state));
+
+    if let Some((panel_lines, width, _)) = state.side_panel {
+        draw_panel_row(ab, state, panel_lines, 0, width);
     }
 
     let mut line = String::new();
@@ -185,16 +205,56 @@ fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
     }
 
     let line_chars: Vec<char> = line.chars().collect();
-    let truncated: String = if line_chars.len() > state.screencols {
-        line_chars[..state.screencols].iter().collect()
+    let truncated: String = if line_chars.len() > tabs_width {
+        line_chars[..tabs_width].iter().collect()
     } else {
         line
     };
     ab.append(&truncated);
-    for _ in truncated.chars().count()..state.screencols {
+    for _ in truncated.chars().count()..tabs_width {
         ab.append(" ");
     }
     ab.append("\r\n");
+}
+
+fn draw_panel_row(
+    ab: &mut AppendBuffer,
+    state: &ViewState,
+    panel_lines: &[crate::plugin::protocol::RenderLine],
+    y: usize,
+    width: usize,
+) {
+    let theme = &state.config.theme;
+    let true_color = state.config.true_color;
+
+    let mut written = 0usize;
+    if let Some(line) = panel_lines.get(y) {
+        for segment in &line.segments {
+            if written >= width {
+                break;
+            }
+            let color = segment.color.unwrap_or(theme.normal);
+            ab.append(&fg_sequence(color, true_color));
+            if segment.bold {
+                ab.append("\x1b[1m");
+            }
+            let remaining = width - written;
+            let text_len = segment.text.chars().count().min(remaining);
+            let text_trunc: String = segment.text.chars().take(text_len).collect();
+            ab.append(&text_trunc);
+            if segment.bold {
+                ab.append("\x1b[22m");
+            }
+            ab.append(reset_fg_sequence());
+            written += text_len;
+        }
+    }
+    for _ in written..width {
+        ab.append(" ");
+    }
+    ab.append(&fg_sequence(theme.comment, true_color));
+    ab.append("\u{2502}");
+    ab.append(reset_fg_sequence());
 }
 
 fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
@@ -202,7 +262,7 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
     let buffer = &ob.buffer;
     let text_rows = text_area_screen_rows(state);
     let gutter = gutter_width(state);
-    let text_cols = state.screencols.saturating_sub(gutter).max(1);
+    let text_cols = text_area_screen_cols(state);
 
     let true_color = state.config.true_color;
     let theme = &state.config.theme;
@@ -216,6 +276,10 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
 
     for y in 0..text_rows {
         let filerow = y + state.rowoff;
+
+        if let Some((panel_lines, width, _)) = state.side_panel {
+            draw_panel_row(ab, state, panel_lines, y + 1, width);
+        }
 
         if gutter > 0 {
             ab.append(&fg_sequence(theme.line_number_fg, true_color));
@@ -324,9 +388,6 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let entries = crate::view::help_text::short_help_entries(state.i18n);
     let min_gap = 2usize;
 
-    // Largeur naturelle de chaque paire empilee (haut, bas), sans jamais
-    // tronquer le texte : c'est le plus long des deux libelles de la
-    // colonne.
     let pairs: Vec<(
         &crate::view::help_text::ShortHelpEntry,
         Option<&crate::view::help_text::ShortHelpEntry>,
@@ -343,10 +404,6 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
         })
         .collect();
 
-    // On ajoute des colonnes tant qu'elles rentrent entierement (largeur
-    // naturelle + marge minimale entre colonnes), sans jamais tronquer un
-    // libelle : si une colonne ne rentre plus, on s'arrete la plutot que
-    // de couper son texte.
     let mut num_columns = 0usize;
     let mut used = 0usize;
     for (i, &w) in natural_widths.iter().enumerate() {
@@ -379,11 +436,6 @@ fn draw_help_bar(ab: &mut AppendBuffer, state: &ViewState) {
     draw_help_grid_line(ab, state.screencols, &bottom_cells, &column_widths);
 }
 
-/// Dessine une ligne du bandeau d'aide avec des colonnes de largeur fixe
-/// (`column_widths`), identiques sur les deux lignes du bandeau, pour que
-/// chaque colonne s'aligne verticalement lettre pour lettre. L'espace
-/// restant est reparti en marges egales entre les colonnes (bords colles
-/// aux marges, comme le format justifie existant).
 fn draw_help_grid_line(
     ab: &mut AppendBuffer,
     width: usize,
@@ -427,8 +479,6 @@ fn draw_help_grid_line(
         ab.append(&cell_trunc);
         written += cell_len;
 
-        // Complete jusqu'a la largeur de la colonne pour que la colonne
-        // suivante demarre au meme endroit sur les deux lignes.
         let pad_to_col = col_width
             .saturating_sub(cell_len)
             .min(width.saturating_sub(written));
@@ -456,15 +506,6 @@ fn draw_help_grid_line(
     ab.append("\r\n");
 }
 
-/// Ecrit `text` caractere par caractere, en affichant le caractere a
-/// `cursor_offset` (index 0-indexe dans `text`) en video inversee pour
-/// simuler un curseur de saisie "custom", distinct du curseur reel du
-/// terminal qui reste sur le document pendant la saisie. Si `cursor_offset`
-/// pointe juste apres le dernier caractere (fin de saisie), un espace
-/// inverse est ajoute pour representer le curseur, sauf si `text` occupe
-/// deja toute la largeur disponible (`max_width`), auquel cas le dernier
-/// caractere existant est inverse a la place pour ne jamais depasser la
-/// largeur du terminal.
 fn append_with_custom_cursor(
     ab: &mut AppendBuffer,
     text: &str,
@@ -499,7 +540,6 @@ fn append_with_custom_cursor(
             chars.len()
         }
         Some(_) => {
-            // Le curseur est juste apres le dernier caractere tape.
             ab.append(text);
             ab.append("\x1b[7m \x1b[27m");
             chars.len() + 1
@@ -507,18 +547,11 @@ fn append_with_custom_cursor(
     }
 }
 
-/// Dessine la barre de statut. Le curseur reel du terminal reste toujours
-/// sur le document ; un curseur custom (video inversee) est dessine
-/// directement dans le texte pour indiquer la position de saisie pendant
-/// un prompt ou une recherche.
 fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     if let Some(prompt_text) = &state.prompt_text {
         let line = format!(" {}", prompt_text);
         let (first, second) = wrap_message_two_lines(&line, state.screencols);
 
-        // Le curseur logique se trouve a `1 + offset` dans `line` (le " "
-        // ajoute en prefixe compte pour 1). On localise sur quelle ligne
-        // affichee (avant/apres le wrap) il tombe.
         let first_len = first.chars().count();
         let line_total = line.chars().count();
         let mut first_cursor = None;
@@ -713,6 +746,50 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\x1b[K");
 }
 
+fn draw_plugin_view(
+    ab: &mut AppendBuffer,
+    state: &ViewState,
+    lines: &[crate::plugin::protocol::RenderLine],
+) {
+    let theme = &state.config.theme;
+    let true_color = state.config.true_color;
+    let mut rows_used = 0usize;
+
+    for line in lines {
+        if rows_used >= state.screenrows {
+            break;
+        }
+        let mut written = 0usize;
+        for segment in &line.segments {
+            if written >= state.screencols {
+                break;
+            }
+            let color = segment.color.unwrap_or(theme.normal);
+            ab.append(&fg_sequence(color, true_color));
+            if segment.bold {
+                ab.append("\x1b[1m");
+            }
+            let remaining = state.screencols - written;
+            let text_len = segment.text.chars().count().min(remaining);
+            let text_trunc: String = segment.text.chars().take(text_len).collect();
+            ab.append(&text_trunc);
+            if segment.bold {
+                ab.append("\x1b[22m");
+            }
+            ab.append(reset_fg_sequence());
+            written += text_len;
+        }
+        ab.append("\x1b[K");
+        ab.append("\r\n");
+        rows_used += 1;
+    }
+
+    for _ in rows_used..state.screenrows {
+        ab.append("\x1b[K");
+        ab.append("\r\n");
+    }
+}
+
 pub fn refresh(state: &ViewState) -> String {
     let mut ab = AppendBuffer::new();
 
@@ -725,6 +802,12 @@ pub fn refresh(state: &ViewState) -> String {
         return ab.data().to_string();
     }
 
+    if let Some(lines) = state.plugin_view {
+        draw_plugin_view(&mut ab, state, lines);
+        ab.append("\x1b[?25l");
+        return ab.data().to_string();
+    }
+
     draw_tab_bar(&mut ab, state);
     draw_rows(&mut ab, state);
     draw_status_bar(&mut ab, state);
@@ -733,18 +816,20 @@ pub fn refresh(state: &ViewState) -> String {
 
     let ob = state.buffer_manager.active();
     let gutter = gutter_width(state);
-    let tab_bar_height = if state.buffer_manager.count() > 1 {
-        1
-    } else {
-        0
-    };
+    let panel_width = side_panel_width(state);
+    let tab_bar_height_val = tab_bar_height(state);
 
-    // Le curseur reel du terminal reste toujours sur le document, meme
-    // pendant un prompt ou une recherche : la position de saisie est
-    // indiquee separement par un curseur custom (video inversee) dessine
-    // dans draw_status_bar, pour qu'on voie les deux a la fois.
-    let cursor_row = tab_bar_height + (ob.cursor.cy.saturating_sub(state.rowoff)) + 1;
-    let cursor_col = gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;
+    let panel_focused = state
+        .side_panel
+        .map(|(_, _, focused)| focused)
+        .unwrap_or(false);
+    if panel_focused {
+        ab.append("\x1b[?25l");
+        return ab.data().to_string();
+    }
+
+    let cursor_row = tab_bar_height_val + (ob.cursor.cy.saturating_sub(state.rowoff)) + 1;
+    let cursor_col = panel_width + gutter + (ob.cursor.rx.saturating_sub(state.coloff)) + 1;
     ab.append(&format!("\x1b[{};{}H", cursor_row, cursor_col));
 
     ab.append("\x1b[?25h");
@@ -771,8 +856,6 @@ mod tests {
         assert!(!first.ends_with(' '));
         let second = second.expect("le message devrait se couper sur 2 lignes");
         assert!(second.chars().count() <= 30);
-        // Aucune coupure au milieu d'un mot : la premiere ligne se termine
-        // par un mot complet, la deuxieme reprend au mot suivant.
         assert_eq!(first, "Remplacer \"X\" ? (o)ui / (n)on");
         assert_eq!(second, "/ (t)out / Echap pour arreter");
     }
@@ -812,8 +895,6 @@ mod tests {
     #[test]
     fn test_custom_cursor_at_end_when_line_is_full() {
         let mut ab = AppendBuffer::new();
-        // "hi" occupe deja toute la largeur disponible (2) : pas de place
-        // pour ajouter un espace-curseur, on inverse le dernier caractere.
         let written = append_with_custom_cursor(&mut ab, "hi", Some(2), 2);
         assert_eq!(written, 2);
         assert_eq!(ab.data(), "h\x1b[7mi\x1b[27m");
