@@ -81,6 +81,9 @@
   "status.no_plugins_active": "No plugins active",
   "cli.explorer_plugin_not_loaded": "The file-explorer plugin is not loaded",
   "cli.pretty_cat_plugin_not_loaded": "The pretty-cat plugin is not loaded (-a needs it)",
+  "cli.finder_plugin_not_loaded": "The finder plugin is not loaded (-f needs it)",
+  "cli.grep_plugin_not_loaded": "The grep plugin is not loaded (-g needs it)",
+  "cli.diff_plugin_not_loaded": "The diff plugin is not loaded (-d needs it)",
   "cli.is_a_directory_use_e": "\"%s\" is a directory, use -e to explore it",
   "cli.is_a_directory_enable_plugin": "\"%s\" is a directory, enable the file-explorer plugin to open directories",
 

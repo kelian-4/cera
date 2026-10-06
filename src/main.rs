@@ -11,7 +11,21 @@ fn main() {
     };
 
     match command {
-        Command::Show { files } => run_show(&files),
+        Command::Show { files } => run_cli_plugin(
+            "pretty-cat",
+            "--cat",
+            &files,
+            "cli.pretty_cat_plugin_not_loaded",
+        ),
+        Command::Find { name } => {
+            run_cli_plugin("finder", "--find", &[name], "cli.finder_plugin_not_loaded")
+        }
+        Command::Grep { pattern } => {
+            run_cli_plugin("grep", "--grep", &[pattern], "cli.grep_plugin_not_loaded")
+        }
+        Command::Diff { files } => {
+            run_cli_plugin("diff", "--diff", &files, "cli.diff_plugin_not_loaded")
+        }
         Command::Edit { explorer, files } => run_edit(explorer, &files),
     }
 }
@@ -23,10 +37,16 @@ fn describe_cli_error(e: &CliError) -> String {
         CliError::ShowAndExplorer => {
             "-a/--afficher et -e/--explorer sont incompatibles".to_string()
         }
+        CliError::IncompatibleOptions => {
+            "-a, -e, -f, -g et -d sont incompatibles entre eux".to_string()
+        }
+        CliError::FindExpectsOneName => "-f/--find attend exactement un nom".to_string(),
+        CliError::GrepExpectsOnePattern => "-g/--grep attend exactement un motif".to_string(),
+        CliError::DiffNeedsTwoFiles => "-d/--diff attend au moins deux fichiers".to_string(),
     }
 }
 
-fn run_show(files: &[String]) -> ! {
+fn run_cli_plugin(plugin_id: &str, mode_flag: &str, args: &[String], not_loaded_key: &str) -> ! {
     let config_path = cera::io::config::default_config_path();
     cera::io::config::ensure_config_file_exists(&config_path);
     let (config, _) = cera::io::config::load_from_file(&config_path);
@@ -35,17 +55,17 @@ fn run_show(files: &[String]) -> ! {
     let plugins_dir =
         cera::plugin::registry::plugins_directory(config.plugins_directory.as_deref());
     let manifest =
-        plugins_dir.and_then(|dir| cera::plugin::registry::load_manifest(&dir, "pretty-cat"));
+        plugins_dir.and_then(|dir| cera::plugin::registry::load_manifest(&dir, plugin_id));
 
-    let is_enabled = config.plugins_enabled.iter().any(|id| id == "pretty-cat");
+    let is_enabled = config.plugins_enabled.iter().any(|id| id == plugin_id);
     let Some(manifest) = manifest.filter(|_| is_enabled) else {
-        eprintln!("cera: {}", i18n.t("cli.pretty_cat_plugin_not_loaded"));
+        eprintln!("cera: {}", i18n.t(not_loaded_key));
         std::process::exit(1);
     };
 
     let mut command_args = manifest.args.clone();
-    command_args.push("--cat".to_string());
-    command_args.extend(files.iter().cloned());
+    command_args.push(mode_flag.to_string());
+    command_args.extend(args.iter().cloned());
 
     let status = std::process::Command::new(&manifest.command)
         .args(&command_args)
@@ -58,7 +78,7 @@ fn run_show(files: &[String]) -> ! {
                 "cera: {}",
                 i18n.t1(
                     "status.plugin_failed_to_start",
-                    &format!("pretty-cat ({})", e)
+                    &format!("{} ({})", plugin_id, e)
                 )
             );
             std::process::exit(1);

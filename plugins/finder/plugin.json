@@ -1,0 +1,6 @@
+{
+  "name": "Finder",
+  "description": "Recherche un fichier par son nom (cera -f nom)",
+  "command": "python3",
+  "args": ["main.py"]
+}

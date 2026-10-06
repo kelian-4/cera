@@ -104,10 +104,16 @@ n'est pas lu par Cera).
 - **file-explorer** (`^E`) : arborescence de fichiers navigable au
   clavier (Haut/Bas pour se deplacer, Entree pour ouvrir un fichier ou
   plier/deplier un dossier, Droite/Gauche pour deplier/replier).
-- **pretty-cat** (`^A`) : affiche un fichier en lecture seule avec
+- **pretty-cat** (`cera -a fichier...`) : affiche un fichier en lecture seule avec
   numeros de ligne et coloration syntaxique basique (Haut/Bas/PageUp/
   PageDown pour faire defiler).
 
-Les deux sont ecrits en Python (stdlib seule, aucune dependance) a titre
+- **finder** (`cera -f nom`) : cherche recursivement, depuis le repertoire
+  courant, les fichiers dont le nom contient `nom` (sans tenir compte de
+  la casse) et affiche leur chemin, un par ligne. Code de sortie 1 si
+  rien n'est trouve. Sans raccourci, utilisable uniquement en ligne de
+  commande.
+
+Tous sont ecrits en Python (stdlib seule, aucune dependance) a titre
 d'exemple ; rien n'empeche d'ecrire un plugin dans un autre langage tant
 qu'il respecte le protocole ci-dessus.

@@ -81,6 +81,9 @@
   "status.no_plugins_active": "Aucun plugin actif",
   "cli.explorer_plugin_not_loaded": "Le plugin file-explorer n'est pas charge",
   "cli.pretty_cat_plugin_not_loaded": "Le plugin pretty-cat n'est pas charge (-a en a besoin)",
+  "cli.finder_plugin_not_loaded": "Le plugin finder n'est pas charge (-f en a besoin)",
+  "cli.grep_plugin_not_loaded": "Le plugin grep n'est pas charge (-g en a besoin)",
+  "cli.diff_plugin_not_loaded": "Le plugin diff n'est pas charge (-d en a besoin)",
   "cli.is_a_directory_use_e": "\"%s\" est un repertoire, utilisez -e pour l'explorer",
   "cli.is_a_directory_enable_plugin": "\"%s\" est un repertoire, activez le plugin file-explorer pour ouvrir des dossiers",
 

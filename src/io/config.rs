@@ -58,7 +58,11 @@ impl Default for Config {
             mouse_enabled: true,
             theme: ThemeColors::default(),
             language: None,
-            plugins_enabled: vec!["file-explorer".to_string(), "pretty-cat".to_string()],
+            plugins_enabled: vec![
+                "file-explorer".to_string(),
+                "pretty-cat".to_string(),
+                "finder".to_string(),
+            ],
             plugins_directory: None,
         }
     }
@@ -103,7 +107,7 @@ fn default_config_json() -> String {
   "mouse_enabled": true,
   "language": null,
   "plugins": {
-    "enabled": ["file-explorer", "pretty-cat"],
+    "enabled": ["file-explorer", "pretty-cat", "finder"],
     "directory": null
   },
   "theme": {
@@ -236,7 +240,11 @@ mod tests {
         assert_eq!(cfg.quit_times, 1);
         assert_eq!(
             cfg.plugins_enabled,
-            vec!["file-explorer".to_string(), "pretty-cat".to_string()]
+            vec![
+                "file-explorer".to_string(),
+                "pretty-cat".to_string(),
+                "finder".to_string()
+            ]
         );
         assert_eq!(cfg.plugins_directory, None);
     }
