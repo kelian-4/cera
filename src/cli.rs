@@ -12,6 +12,7 @@ pub enum Command {
     },
     Grep {
         pattern: String,
+        paths: Vec<String>,
     },
     Diff {
         files: Vec<String>,
@@ -25,7 +26,7 @@ pub enum CliError {
     ShowAndExplorer,
     IncompatibleOptions,
     FindExpectsOneName,
-    GrepExpectsOnePattern,
+    GrepWithoutPattern,
     DiffNeedsTwoFiles,
 }
 
@@ -104,9 +105,14 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
     }
 
     if grep_requested {
-        return single_argument(positional)
-            .map(|pattern| Command::Grep { pattern })
-            .ok_or(CliError::GrepExpectsOnePattern);
+        let mut iter = positional.into_iter();
+        return match iter.next() {
+            Some(pattern) => Ok(Command::Grep {
+                pattern,
+                paths: iter.collect(),
+            }),
+            None => Err(CliError::GrepWithoutPattern),
+        };
     }
 
     if diff_requested {
@@ -279,29 +285,41 @@ mod tests {
     }
 
     #[test]
-    fn test_grep_takes_one_pattern() {
+    fn test_grep_takes_pattern_without_paths() {
         for flag in ["-g", "--grep"] {
             assert_eq!(
                 p(&[flag, "fn main"]),
                 Ok(Command::Grep {
-                    pattern: "fn main".into()
+                    pattern: "fn main".into(),
+                    paths: vec![]
                 })
             );
         }
     }
 
     #[test]
-    fn test_grep_requires_exactly_one_pattern() {
-        assert_eq!(p(&["-g"]), Err(CliError::GrepExpectsOnePattern));
-        assert_eq!(p(&["-g", "a", "b"]), Err(CliError::GrepExpectsOnePattern));
+    fn test_grep_takes_pattern_then_paths() {
+        assert_eq!(
+            p(&["-g", "fn main", "src/main.rs", "plugins"]),
+            Ok(Command::Grep {
+                pattern: "fn main".into(),
+                paths: vec!["src/main.rs".into(), "plugins".into()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_grep_requires_a_pattern() {
+        assert_eq!(p(&["-g"]), Err(CliError::GrepWithoutPattern));
     }
 
     #[test]
     fn test_grep_pattern_starting_with_dash_needs_double_dash() {
         assert_eq!(
-            p(&["-g", "--", "-x"]),
+            p(&["-g", "--", "-x", "src"]),
             Ok(Command::Grep {
-                pattern: "-x".into()
+                pattern: "-x".into(),
+                paths: vec!["src".into()]
             })
         );
     }

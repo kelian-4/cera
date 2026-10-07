@@ -1,6 +1,6 @@
 {
   "name": "Grep",
-  "description": "Recherche un texte dans les fichiers du dossier courant (cera -g motif)",
+  "description": "Recherche un texte dans les fichiers du dossier courant (cera -g motif [fichier|dossier ...])",
   "command": "python3",
   "args": ["main.py"]
 }

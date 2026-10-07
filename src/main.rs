@@ -20,8 +20,10 @@ fn main() {
         Command::Find { name } => {
             run_cli_plugin("finder", "--find", &[name], "cli.finder_plugin_not_loaded")
         }
-        Command::Grep { pattern } => {
-            run_cli_plugin("grep", "--grep", &[pattern], "cli.grep_plugin_not_loaded")
+        Command::Grep { pattern, paths } => {
+            let mut args = vec![pattern];
+            args.extend(paths);
+            run_cli_plugin("grep", "--grep", &args, "cli.grep_plugin_not_loaded")
         }
         Command::Diff { files } => {
             run_cli_plugin("diff", "--diff", &files, "cli.diff_plugin_not_loaded")
@@ -41,7 +43,9 @@ fn describe_cli_error(e: &CliError) -> String {
             "-a, -e, -f, -g et -d sont incompatibles entre eux".to_string()
         }
         CliError::FindExpectsOneName => "-f/--find attend exactement un nom".to_string(),
-        CliError::GrepExpectsOnePattern => "-g/--grep attend exactement un motif".to_string(),
+        CliError::GrepWithoutPattern => {
+            "-g/--grep attend un motif, suivi de fichiers ou dossiers optionnels".to_string()
+        }
         CliError::DiffNeedsTwoFiles => "-d/--diff attend au moins deux fichiers".to_string(),
     }
 }
