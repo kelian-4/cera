@@ -116,6 +116,38 @@ pub fn full_documentation(
     categories
 }
 
+pub enum DocLine {
+    Header(String),
+    Entry {
+        shortcut: String,
+        description: String,
+    },
+    Blank,
+}
+
+pub fn flatten_documentation(categories: &[HelpCategory]) -> Vec<DocLine> {
+    let mut lines = Vec::new();
+    for category in categories {
+        lines.push(DocLine::Header(category.name.clone()));
+        for entry in &category.entries {
+            lines.push(DocLine::Entry {
+                shortcut: entry.shortcut.clone(),
+                description: entry.description.clone(),
+            });
+        }
+        lines.push(DocLine::Blank);
+    }
+    lines
+}
+
+pub fn doc_visible_rows(screenrows: usize) -> usize {
+    screenrows.saturating_sub(2)
+}
+
+pub fn clamp_doc_scroll(scroll: usize, total_lines: usize, visible_rows: usize) -> usize {
+    scroll.min(total_lines.saturating_sub(visible_rows))
+}
+
 pub fn cli_help_text(
     i18n: &crate::i18n::Translations,
     plugins: &[crate::plugin::registry::PluginManifest],
@@ -204,6 +236,42 @@ mod tests {
         assert!(text.contains("Active plugins:"));
         assert!(text.contains("Finder"));
         assert!(text.contains("cera -f name"));
+    }
+
+    #[test]
+    fn test_flatten_documentation_counts_header_entries_and_blank() {
+        let categories = vec![
+            HelpCategory {
+                name: "A".to_string(),
+                entries: vec![HelpEntry {
+                    shortcut: "x".to_string(),
+                    description: "d".to_string(),
+                }],
+            },
+            HelpCategory {
+                name: "B".to_string(),
+                entries: vec![],
+            },
+        ];
+        let lines = flatten_documentation(&categories);
+        assert_eq!(lines.len(), (1 + 1 + 1) + (1 + 1));
+        assert!(matches!(lines[0], DocLine::Header(_)));
+        assert!(matches!(lines[1], DocLine::Entry { .. }));
+        assert!(matches!(lines[2], DocLine::Blank));
+    }
+
+    #[test]
+    fn test_clamp_doc_scroll_never_passes_the_last_page() {
+        assert_eq!(clamp_doc_scroll(0, 30, 10), 0);
+        assert_eq!(clamp_doc_scroll(15, 30, 10), 15);
+        assert_eq!(clamp_doc_scroll(99, 30, 10), 20);
+        assert_eq!(clamp_doc_scroll(5, 8, 10), 0);
+    }
+
+    #[test]
+    fn test_doc_visible_rows_leaves_title_and_last_row() {
+        assert_eq!(doc_visible_rows(24), 22);
+        assert_eq!(doc_visible_rows(1), 0);
     }
 
     #[test]

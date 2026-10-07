@@ -16,7 +16,7 @@
   "help.docs": "docs",
   "help.toggle_hint": "^H ayuda",
 
-  "doc.title": " Documentacion de Cera -- Escape para volver al archivo ",
+  "doc.title": " Documentacion de Cera -- Escape para volver al archivo -- Arriba/Abajo para desplazar ",
   "doc.no_filename": "[Sin nombre]",
   "doc.modified_suffix": "[modificado]",
   "doc.category.file": "Archivo",

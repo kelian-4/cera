@@ -16,7 +16,7 @@
   "help.docs": "docs",
   "help.toggle_hint": "^H aide",
 
-  "doc.title": " Documentation de Cera -- Echap pour revenir au fichier ",
+  "doc.title": " Documentation de Cera -- Echap pour revenir au fichier -- Haut/Bas pour defiler ",
   "doc.no_filename": "[Sans nom]",
   "doc.modified_suffix": "[modifie]",
   "doc.category.file": "Fichier",

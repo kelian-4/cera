@@ -45,6 +45,7 @@ pub struct Editor {
     quit_times: i32,
 
     overlay_full_doc: bool,
+    doc_scroll: usize,
     help_active: bool,
     prompt_text: Option<String>,
     prompt_cursor_offset: Option<usize>,
@@ -98,6 +99,7 @@ impl Editor {
             status_message_kind: MessageKind::Info,
             status_message_time: std::time::Instant::now(),
             overlay_full_doc: false,
+            doc_scroll: 0,
             help_active: false,
             prompt_text: None,
             prompt_cursor_offset: None,
@@ -153,6 +155,7 @@ impl Editor {
             status_message_kind: self.status_message_kind,
             status_message_age_seconds: self.status_message_time.elapsed().as_secs() as i64,
             overlay_full_doc: self.overlay_full_doc,
+            doc_scroll: self.doc_scroll,
             help_active: self.help_active,
             prompt_text: self.prompt_text.clone(),
             prompt_cursor_offset: self.prompt_cursor_offset,
@@ -1764,6 +1767,48 @@ impl Editor {
 
     fn toggle_full_doc(&mut self) {
         self.overlay_full_doc = !self.overlay_full_doc;
+        self.doc_scroll = 0;
+    }
+
+    fn doc_max_scroll(&self) -> usize {
+        let total = crate::view::help_text::flatten_documentation(
+            &crate::view::help_text::full_documentation(&self.i18n, &self.plugin_manifests),
+        )
+        .len();
+        let visible = crate::view::help_text::doc_visible_rows(self.screenrows);
+        crate::view::help_text::clamp_doc_scroll(usize::MAX, total, visible)
+    }
+
+    fn scroll_doc(&mut self, delta: i32) {
+        let max = self.doc_max_scroll();
+        let moved = if delta < 0 {
+            self.doc_scroll
+                .saturating_sub(delta.unsigned_abs() as usize)
+        } else {
+            self.doc_scroll.saturating_add(delta as usize)
+        };
+        self.doc_scroll = moved.min(max);
+    }
+
+    fn handle_full_doc_key(&mut self, c: i32) {
+        let page = crate::view::help_text::doc_visible_rows(self.screenrows).max(1) as i32;
+        match c {
+            0x1b => self.overlay_full_doc = false,
+            k if k == ctrl('d') => self.overlay_full_doc = false,
+            terminal::ARROW_UP => self.scroll_doc(-1),
+            terminal::ARROW_DOWN => self.scroll_doc(1),
+            terminal::PAGE_UP => self.scroll_doc(-page),
+            terminal::PAGE_DOWN => self.scroll_doc(page),
+            terminal::HOME_KEY => self.doc_scroll = 0,
+            terminal::END_KEY => self.doc_scroll = self.doc_max_scroll(),
+            terminal::MOUSE_EVENT => {
+                let ev = self.terminal.last_mouse_event();
+                if ev.is_wheel {
+                    self.scroll_doc(ev.wheel_delta * 3);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn handle_mouse_event(&mut self, ev: MouseEvent) {
@@ -1905,9 +1950,7 @@ impl Editor {
         }
 
         if self.overlay_full_doc {
-            if c == 0x1b || c == ctrl('d') {
-                self.overlay_full_doc = false;
-            }
+            self.handle_full_doc_key(c);
             return;
         }
 

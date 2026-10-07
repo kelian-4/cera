@@ -16,7 +16,7 @@
   "help.docs": "docs",
   "help.toggle_hint": "^H help",
 
-  "doc.title": " Cera Documentation -- Escape to return to the file ",
+  "doc.title": " Cera Documentation -- Escape to return to the file -- Up/Down to scroll ",
   "doc.no_filename": "[No name]",
   "doc.modified_suffix": "[modified]",
   "doc.category.file": "File",

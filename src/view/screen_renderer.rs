@@ -2,7 +2,10 @@ use crate::editor::buffer_manager::BufferManager;
 use crate::io::config::Config;
 use crate::model::selection::Position;
 use crate::view::colors::{bg_sequence, fg_sequence, reset_fg_sequence};
-use crate::view::help_text::{full_documentation, MessageKind};
+use crate::view::help_text::{
+    clamp_doc_scroll, doc_visible_rows, flatten_documentation, full_documentation, DocLine,
+    MessageKind,
+};
 
 #[derive(Clone, Copy, Default)]
 pub struct SearchDisplayInfo {
@@ -21,6 +24,7 @@ pub struct ViewState<'a> {
     pub status_message_kind: MessageKind,
     pub status_message_age_seconds: i64,
     pub overlay_full_doc: bool,
+    pub doc_scroll: usize,
     pub help_active: bool,
     pub prompt_text: Option<String>,
     pub prompt_cursor_offset: Option<usize>,
@@ -707,35 +711,30 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\r\n");
 
     let mut rows_used = 1usize;
-    for cat in full_documentation(state.i18n, state.plugins) {
-        if rows_used >= state.screenrows.saturating_sub(1) {
-            break;
+    let lines = flatten_documentation(&full_documentation(state.i18n, state.plugins));
+    let visible = doc_visible_rows(state.screenrows);
+    let scroll = clamp_doc_scroll(state.doc_scroll, lines.len(), visible);
+    for line in lines.iter().skip(scroll).take(visible) {
+        match line {
+            DocLine::Header(name) => {
+                ab.append(&fg_sequence(theme.keyword1, true_color));
+                ab.append(name);
+                ab.append(reset_fg_sequence());
+            }
+            DocLine::Entry {
+                shortcut,
+                description,
+            } => {
+                let text = format!("  {:<14} {}", shortcut, description);
+                let text_len = text.chars().count().min(state.screencols);
+                let text_trunc: String = text.chars().take(text_len).collect();
+                ab.append(&text_trunc);
+            }
+            DocLine::Blank => {}
         }
-        ab.append(&fg_sequence(theme.keyword1, true_color));
-        ab.append(&cat.name);
-        ab.append(reset_fg_sequence());
         ab.append("\x1b[K");
         ab.append("\r\n");
         rows_used += 1;
-
-        for entry in &cat.entries {
-            if rows_used >= state.screenrows.saturating_sub(1) {
-                break;
-            }
-            let line = format!("  {:<14} {}", entry.shortcut, entry.description);
-            let line_len = line.chars().count().min(state.screencols);
-            let line_trunc: String = line.chars().take(line_len).collect();
-            ab.append(&line_trunc);
-            ab.append("\x1b[K");
-            ab.append("\r\n");
-            rows_used += 1;
-        }
-
-        if rows_used < state.screenrows.saturating_sub(1) {
-            ab.append("\x1b[K");
-            ab.append("\r\n");
-            rows_used += 1;
-        }
     }
 
     while rows_used < state.screenrows {
