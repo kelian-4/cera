@@ -51,6 +51,32 @@ mon-plugin/
   titre informatif ; c'est bien ce raccourci qui declenche le plugin dans
   Cera.
 
+## Langages testes
+
+Un plugin peut etre ecrit dans n'importe quel langage capable de lire
+l'entree standard ligne par ligne et d'ecrire du JSON sur la sortie
+standard. Le protocole est verifie automatiquement (`cargo test`, fichier
+`tests/plugin_languages.rs`) avec un plugin d'exemple dans chacun de ces
+langages, en mode `fullscreen` et en mode `panel` :
+
+| Langage | Exemple | Lance avec |
+|---|---|---|
+| Python | `tests/plugin_examples/hello.py` | `python3` |
+| JavaScript | `tests/plugin_examples/hello.js` | `node` |
+| C | `tests/plugin_examples/hello.c` | binaire compile avec `cc` |
+| C++ | `tests/plugin_examples/hello.cpp` | binaire compile avec `c++` |
+| Rust | `tests/plugin_examples/hello.rs` | binaire compile avec `rustc` |
+
+Chaque exemple gere `init`, `key` (y compris un caractere non ASCII),
+`resize`, `click`, `focus` et `shutdown`, et emet `render` (avec couleur
+et gras), `status`, `open_file` et `close`. Il ecrit aussi une ligne qui
+n'est pas du JSON au demarrage, pour verifier qu'elle est ignoree. Les
+exemples sont un bon point de depart pour un plugin dans ces langages.
+
+Si un outil (`node`, `cc`, `c++`, `rustc`, `python3`) est absent, le test
+du langage correspondant est ignore, sauf si la variable d'environnement
+`CERA_REQUIRE_PLUGIN_LANGS` est definie (c'est le cas dans la CI).
+
 ## Cycle de vie
 
 1. Cera lance l'executable et lui envoie un message `init`.

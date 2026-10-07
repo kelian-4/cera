@@ -61,6 +61,8 @@ jobs:
       - name: Lancer les tests
         id: tests
         if: always() && steps.fmt.outcome != 'cancelled'
+        env:
+          CERA_REQUIRE_PLUGIN_LANGS: "1"
         shell: bash
         run: |
           set -o pipefail

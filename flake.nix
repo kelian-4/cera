@@ -55,6 +55,8 @@
             rustfmt
             rust-analyzer
             python3
+            nodejs
+            gcc
           ];
         };
       });
