@@ -78,7 +78,6 @@
   "status.confirm_quit_unsaved": "Unsaved changes. Ctrl-Q: quit, Escape: cancel",
   "status.plugin_failed_to_start": "Could not start plugin \"%s\"",
   "status.plugin_exited": "Plugin \"%s\" exited unexpectedly",
-  "status.no_plugins_active": "No plugins active",
   "cli.explorer_plugin_not_loaded": "The file-explorer plugin is not loaded",
   "cli.pretty_cat_plugin_not_loaded": "The pretty-cat plugin is not loaded (-a needs it)",
   "cli.finder_plugin_not_loaded": "The finder plugin is not loaded (-f needs it)",

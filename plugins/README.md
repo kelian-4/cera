@@ -43,8 +43,7 @@ mon-plugin/
   typiquement le chemin du script principal, comme `"main.py"`).
 - `shortcut` : raccourci Ctrl suggere (ex: `"^E"` pour Ctrl-E), affiche a
   titre informatif ; c'est bien ce raccourci qui declenche le plugin dans
-  Cera. `Ctrl-G` liste toujours tous les plugins actifs si vous ne vous
-  souvenez plus de leurs raccourcis.
+  Cera.
 
 ## Cycle de vie
 

@@ -78,7 +78,6 @@
   "status.confirm_quit_unsaved": "Cambios sin guardar. Ctrl-Q: salir, Escape: cancelar",
   "status.plugin_failed_to_start": "No se pudo iniciar el plugin \"%s\"",
   "status.plugin_exited": "El plugin \"%s\" se detuvo inesperadamente",
-  "status.no_plugins_active": "Ningun plugin activo",
   "cli.explorer_plugin_not_loaded": "El plugin file-explorer no esta cargado",
   "cli.pretty_cat_plugin_not_loaded": "El plugin pretty-cat no esta cargado (-a lo necesita)",
   "cli.finder_plugin_not_loaded": "El plugin finder no esta cargado (-f lo necesita)",

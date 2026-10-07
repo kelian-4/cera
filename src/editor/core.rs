@@ -1131,28 +1131,6 @@ impl Editor {
             .position(|m| m.shortcut.as_deref().and_then(Self::shortcut_to_key_code) == Some(key))
     }
 
-    fn open_plugin_palette(&mut self) {
-        match self.plugin_manifests.len() {
-            0 => {
-                let msg = self.i18n.t("status.no_plugins_active");
-                self.set_status_message(msg);
-            }
-            1 => self.run_plugin(0),
-            _ => {
-                let names: Vec<String> = self
-                    .plugin_manifests
-                    .iter()
-                    .enumerate()
-                    .map(|(i, m)| {
-                        let shortcut = m.shortcut.clone().unwrap_or_default();
-                        format!("{}:{} {}", i + 1, m.name, shortcut)
-                    })
-                    .collect();
-                self.set_status_message(names.join("  "));
-            }
-        }
-    }
-
     fn key_code_to_plugin_key_name(code: i32) -> Option<String> {
         use crate::terminal::*;
         let name = match code {
@@ -1969,7 +1947,6 @@ impl Editor {
             k if k == ctrl('h') => self.toggle_help(),
             k if k == ctrl('d') => self.toggle_full_doc(),
             k if k == ctrl('k') => self.cut_current_line(),
-            k if k == ctrl('g') => self.open_plugin_palette(),
             k if k == ctrl('a') => self.select_all(),
 
             k if self.plugin_shortcut_matches(k) => {
