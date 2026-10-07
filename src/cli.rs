@@ -17,6 +17,7 @@ pub enum Command {
     Diff {
         files: Vec<String>,
     },
+    Help,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -47,7 +48,18 @@ fn single_argument(mut positional: Vec<String>) -> Option<String> {
     }
 }
 
+fn help_requested<S: AsRef<str>>(args: &[S]) -> bool {
+    args.iter()
+        .map(|arg| arg.as_ref())
+        .take_while(|arg| *arg != "--")
+        .any(|arg| arg == "-h" || arg == "--help")
+}
+
 pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
+    if help_requested(args) {
+        return Ok(Command::Help);
+    }
+
     let mut explorer_requested = false;
     let mut show_requested = false;
     let mut find_requested = false;
@@ -350,5 +362,29 @@ mod tests {
             Err(CliError::IncompatibleOptions)
         );
         assert_eq!(p(&["-e", "-f", "x"]), Err(CliError::IncompatibleOptions));
+    }
+
+    #[test]
+    fn test_help_flags() {
+        for flag in ["-h", "--help"] {
+            assert_eq!(p(&[flag]), Ok(Command::Help));
+        }
+    }
+
+    #[test]
+    fn test_help_takes_priority_over_other_arguments() {
+        assert_eq!(p(&["-g", "x", "--help"]), Ok(Command::Help));
+        assert_eq!(p(&["--bogus", "-h"]), Ok(Command::Help));
+    }
+
+    #[test]
+    fn test_help_after_double_dash_is_a_plain_argument() {
+        assert_eq!(
+            p(&["--", "-h"]),
+            Ok(Command::Edit {
+                explorer: None,
+                files: vec!["-h".into()]
+            })
+        );
     }
 }

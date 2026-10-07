@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
-import json
 import os
 import sys
-
-
-def send(msg):
-    sys.stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
 
 
 def find_mode(name):
@@ -24,9 +18,7 @@ def find_mode(name):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--find":
         sys.exit(find_mode(" ".join(sys.argv[2:])))
-    sys.stdin.readline()
-    send({"type": "status", "message": "Utilisez : cera -f nom", "kind": "info"})
-    send({"type": "close"})
+    sys.exit(2)
 
 
 if __name__ == "__main__":

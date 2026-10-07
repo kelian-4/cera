@@ -29,6 +29,7 @@ pub struct ViewState<'a> {
     pub search_cursor: usize,
     pub config: &'a Config,
     pub i18n: &'a crate::i18n::Translations,
+    pub plugins: &'a [crate::plugin::registry::PluginManifest],
     pub plugin_view: Option<&'a [crate::plugin::protocol::RenderLine]>,
     pub side_panel: Option<(&'a [crate::plugin::protocol::RenderLine], usize, bool)>,
 }
@@ -706,7 +707,7 @@ fn draw_full_doc(ab: &mut AppendBuffer, state: &ViewState) {
     ab.append("\r\n");
 
     let mut rows_used = 1usize;
-    for cat in full_documentation(state.i18n) {
+    for cat in full_documentation(state.i18n, state.plugins) {
         if rows_used >= state.screenrows.saturating_sub(1) {
             break;
         }

@@ -29,12 +29,18 @@ mon-plugin/
 {
   "name": "Mon Plugin",
   "description": "Ce que fait le plugin, en une phrase",
+  "help": "Ctrl-E : mode d'emploi en une ligne",
   "command": "python3",
   "args": ["main.py"],
   "shortcut": "^E"
 }
 ```
 
+- `help` : doc minimale du plugin, une ligne courte (idealement moins de
+  60 caracteres) indiquant comment l'utiliser. Elle est affichee dans la
+  categorie Plugins de la documentation (`Ctrl-D`) et dans `cera --help`.
+  Chaque plugin doit en fournir une ; a defaut, `description` est
+  utilisee.
 - `command` : l'executable a lancer. Un nom simple (`python3`, `node`,
   `bash`) est cherche dans le `PATH` ; un chemin contenant `/` est resolu
   par rapport au dossier du plugin.

@@ -1,6 +1,7 @@
 {
   "name": "File Explorer",
   "description": "Explorateur de fichiers et de repertoires, style minimaliste",
+  "help": "Ctrl-E : navigation dans les fichiers (cera -e [dossier])",
   "command": "python3",
   "args": ["main.py"],
   "shortcut": "^E",

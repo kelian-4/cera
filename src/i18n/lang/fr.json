@@ -24,6 +24,7 @@
   "doc.category.search": "Recherche",
   "doc.category.navigation": "Navigation",
   "doc.category.help": "Aide",
+  "doc.category.plugins": "Plugins",
 
   "doc.save": "Sauvegarder le fichier courant",
   "doc.quit": "Quitter Cera (confirmation si modifications non sauvegardees)",
@@ -83,6 +84,15 @@
   "cli.finder_plugin_not_loaded": "Le plugin finder n'est pas charge (-f en a besoin)",
   "cli.grep_plugin_not_loaded": "Le plugin grep n'est pas charge (-g en a besoin)",
   "cli.diff_plugin_not_loaded": "Le plugin diff n'est pas charge (-d en a besoin)",
+  "cli.help.usage": "Usage : cera [options] [fichier ...]",
+  "cli.help.options": "Options :",
+  "cli.help.explorer": "Ouvre l'explorateur sur un dossier (defaut : le dossier courant)",
+  "cli.help.show": "Affiche des fichiers en lecture seule",
+  "cli.help.find": "Cherche des fichiers par leur nom",
+  "cli.help.grep": "Cherche un texte dans des fichiers et dossiers",
+  "cli.help.diff": "Compare chaque fichier au premier",
+  "cli.help.help": "Affiche cette aide",
+  "cli.help.plugins": "Plugins actifs :",
   "cli.is_a_directory_use_e": "\"%s\" est un repertoire, utilisez -e pour l'explorer",
   "cli.is_a_directory_enable_plugin": "\"%s\" est un repertoire, activez le plugin file-explorer pour ouvrir des dossiers",
 

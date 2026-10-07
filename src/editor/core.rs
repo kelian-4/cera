@@ -161,6 +161,7 @@ impl Editor {
             search_cursor: self.search_cursor,
             config: &self.config,
             i18n: &self.i18n,
+            plugins: &self.plugin_manifests,
             plugin_view: self.plugin_view.as_deref(),
             side_panel: self
                 .side_panel

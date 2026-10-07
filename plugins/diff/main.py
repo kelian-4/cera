@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import difflib
-import json
 import sys
 
 RESET = "\x1b[0m"
@@ -8,11 +7,6 @@ BOLD = "\x1b[1m"
 RED = "\x1b[31m"
 GREEN = "\x1b[32m"
 CYAN = "\x1b[36m"
-
-
-def send(msg):
-    sys.stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
 
 
 def read_lines(path):
@@ -62,9 +56,7 @@ def diff_mode(paths):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--diff":
         sys.exit(diff_mode(sys.argv[2:]))
-    sys.stdin.readline()
-    send({"type": "status", "message": "Utilisez : cera -d fichier1 fichier2", "kind": "info"})
-    send({"type": "close"})
+    sys.exit(2)
 
 
 if __name__ == "__main__":

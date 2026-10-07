@@ -1,6 +1,7 @@
 {
   "name": "Pretty Cat",
   "description": "Affiche un fichier en lecture seule avec numeros de ligne et coloration syntaxique basique",
+  "help": "cera -a fichier... : lecture seule avec numeros de ligne",
   "command": "python3",
   "args": ["main.py"]
 }

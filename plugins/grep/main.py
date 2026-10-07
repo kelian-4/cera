@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
-import json
 import os
 import sys
-
-
-def send(msg):
-    sys.stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
 
 
 def is_binary(path):
@@ -65,9 +59,7 @@ def main():
             os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
             code = 0
         sys.exit(code)
-    sys.stdin.readline()
-    send({"type": "status", "message": "Utilisez : cera -g motif", "kind": "info"})
-    send({"type": "close"})
+    sys.exit(2)
 
 
 if __name__ == "__main__":

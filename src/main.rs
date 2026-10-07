@@ -29,7 +29,20 @@ fn main() {
             run_cli_plugin("diff", "--diff", &files, "cli.diff_plugin_not_loaded")
         }
         Command::Edit { explorer, files } => run_edit(explorer, &files),
+        Command::Help => run_help(),
     }
+}
+
+fn run_help() -> ! {
+    let config_path = cera::io::config::default_config_path();
+    cera::io::config::ensure_config_file_exists(&config_path);
+    let (config, _) = cera::io::config::load_from_file(&config_path);
+    let i18n = cera::i18n::load(config.language.as_deref());
+    let plugins = cera::plugin::registry::plugins_directory(config.plugins_directory.as_deref())
+        .map(|dir| cera::plugin::registry::load_enabled_plugins(&dir, &config.plugins_enabled))
+        .unwrap_or_default();
+    print!("{}", cera::view::help_text::cli_help_text(&i18n, &plugins));
+    std::process::exit(0);
 }
 
 fn describe_cli_error(e: &CliError) -> String {
