@@ -118,6 +118,12 @@ n'est pas lu par Cera).
   Code de sortie 0 si tout est identique, 1 s'il y a des differences,
   2 en cas d'erreur de lecture. Sans raccourci, utilisable uniquement en
   ligne de commande.
+- **grep** (`cera -g motif`) : cherche le texte `motif` (litteral, sensible
+  a la casse) dans tous les fichiers du repertoire courant et de ses
+  sous-repertoires, et affiche chaque ligne trouvee sous la forme
+  `chemin:ligne:texte`. Les fichiers binaires sont ignores. Code de
+  sortie 1 si rien n'est trouve. Sans raccourci, utilisable uniquement en
+  ligne de commande.
 
 Tous sont ecrits en Python (stdlib seule, aucune dependance) a titre
 d'exemple ; rien n'empeche d'ecrire un plugin dans un autre langage tant
