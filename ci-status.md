@@ -1,9 +1,9 @@
 # CI Status
 
-Commit: 894f9c80269a68e28800013778135c9be4d58c41
+Commit: bf0cc026420b5ac961b691cd8346ae7a8e539ca4
 Branche: dev
-Date: 2026-10-07 06:49:24 UTC
-Run: https://github.com/kelian-4/cera/actions/runs/37583627174
+Date: 2026-10-07 07:52:48 UTC
+Run: https://github.com/kelian-4/cera/actions/runs/37590043487
 
 | Etape | Resultat |
 |---|---|
@@ -20,7 +20,7 @@ Run: https://github.com/kelian-4/cera/actions/runs/37583627174
 ```
 [1m[92m    Checking[0m nix v0.27.1
 [1m[92m    Checking[0m cera v0.1.0 (/home/runner/work/cera/cera)
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.09s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.84s
 ```
 
 ## Log complet - Build
@@ -33,34 +33,35 @@ Run: https://github.com/kelian-4/cera/actions/runs/37583627174
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=789b2fb61ad4a37f -C extra-filename=-2b70397db7a339b1 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rmeta --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rmeta --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rmeta`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=212ac5ff117fb7ae -C extra-filename=-d0ba6b0fc148147d --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.53s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 2.51s
 ```
 
 ## Log complet - Tests
 ```
 [1m[92m       Fresh[0m libc v0.2.189
-[1m[92m       Fresh[0m cfg-if v1.0.4
 [1m[92m       Fresh[0m bitflags v2.13.2
+[1m[92m       Fresh[0m cfg-if v1.0.4
 [1m[92m       Fresh[0m nix v0.27.1
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ebe8ffbcfca6fd5a -C extra-filename=-8baea2e795c850cf --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=81c1988cab904c4a -C extra-filename=-db7687ae4651fef9 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.80s
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 1.28s
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-8baea2e795c850cf`
 
-running 100 tests
+running 101 tests
 test cli::tests::test_diff_requires_two_files ... ok
 test cli::tests::test_diff_takes_two_or_more_files ... ok
-test cli::tests::test_explorer_dir_can_come_before_the_flag ... ok
 test cli::tests::test_double_dash_ends_options ... ok
+test cli::tests::test_explorer_dir_can_come_before_the_flag ... ok
 test cli::tests::test_explorer_with_dir ... ok
 test cli::tests::test_explorer_with_dir_and_extra_files ... ok
 test cli::tests::test_explorer_without_dir_uses_current_directory ... ok
 test cli::tests::test_find_requires_exactly_one_name ... ok
 test cli::tests::test_find_takes_one_name ... ok
 test cli::tests::test_grep_pattern_starting_with_dash_needs_double_dash ... ok
-test cli::tests::test_grep_takes_one_pattern ... ok
-test cli::tests::test_grep_requires_exactly_one_pattern ... ok
+test cli::tests::test_grep_requires_a_pattern ... ok
+test cli::tests::test_grep_takes_pattern_then_paths ... ok
+test cli::tests::test_grep_takes_pattern_without_paths ... ok
 test cli::tests::test_modes_are_mutually_exclusive ... ok
 test cli::tests::test_no_args_opens_editor_without_files ... ok
 test cli::tests::test_plain_files_open_in_editor ... ok
@@ -80,16 +81,16 @@ test i18n::tests::test_detect_system_language_parses_locale_format ... ok
 test i18n::tests::test_load_falls_back_to_english_for_unknown_language ... ok
 test i18n::tests::test_load_explicit_language ... ok
 test i18n::tests::test_missing_key_returns_key_itself ... ok
+test i18n::tests::test_t1_replaces_placeholder ... ok
 test io::config::tests::test_config_defaults_on_missing_file ... ok
 test io::config::tests::test_config_loads_real_file ... ok
-test i18n::tests::test_t1_replaces_placeholder ... ok
 test io::config::tests::test_config_plugins_enabled_can_be_emptied ... ok
-test io::config::tests::test_config_reads_plugins_section ... ok
 test io::config::tests::test_default_config_path_ends_with_config_json ... ok
+test io::config::tests::test_config_reads_plugins_section ... ok
 test io::config::tests::test_ensure_config_file_exists_never_overwrites_existing_file ... ok
-test io::config::tests::test_ensure_config_file_exists_creates_file_with_parent_dir ... ok
 test io::file_io::tests::test_open_existing_file ... ok
 test io::file_io::tests::test_open_nonexistent_file_creates_empty_buffer ... ok
+test io::config::tests::test_ensure_config_file_exists_creates_file_with_parent_dir ... ok
 test io::file_io::tests::test_save_writes_to_disk ... ok
 test io::json::tests::test_json_invalid ... ok
 test io::json::tests::test_json_nested_object ... ok
@@ -150,7 +151,7 @@ test view::screen_renderer::tests::test_wrap_message_hard_breaks_long_word ... o
 test view::screen_renderer::tests::test_wrap_message_zero_width ... ok
 test plugin::manager::tests::test_spawn_and_roundtrip_with_cat ... ok
 
-test result: ok. 100 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-db7687ae4651fef9`
 
