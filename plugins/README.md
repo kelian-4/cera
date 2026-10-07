@@ -113,6 +113,11 @@ n'est pas lu par Cera).
   la casse) et affiche leur chemin, un par ligne. Code de sortie 1 si
   rien n'est trouve. Sans raccourci, utilisable uniquement en ligne de
   commande.
+- **diff** (`cera -d fichier1 fichier2 ...`) : compare chaque fichier au
+  premier et affiche un diff unifie colore (`+` en vert, `-` en rouge).
+  Code de sortie 0 si tout est identique, 1 s'il y a des differences,
+  2 en cas d'erreur de lecture. Sans raccourci, utilisable uniquement en
+  ligne de commande.
 
 Tous sont ecrits en Python (stdlib seule, aucune dependance) a titre
 d'exemple ; rien n'empeche d'ecrire un plugin dans un autre langage tant

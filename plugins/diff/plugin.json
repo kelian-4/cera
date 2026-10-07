@@ -1,0 +1,6 @@
+{
+  "name": "Diff",
+  "description": "Compare des fichiers au premier (cera -d fichier1 fichier2 ...)",
+  "command": "python3",
+  "args": ["main.py"]
+}
