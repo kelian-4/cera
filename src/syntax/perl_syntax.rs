@@ -9,9 +9,22 @@ pub fn perl_syntax() -> Syntax {
             "foreach", "do", "last", "next", "redo", "return", "package", "use", "require", "qw",
             "shift", "push", "pop", "die", "undef|",
         ],
+        types: &[],
+        constants: &[],
         singleline_comment_start: "#",
-        multiline_comment_start: "",
-        multiline_comment_end: "",
-        flags: HighlightFlags::NUMBERS.union(HighlightFlags::STRINGS),
+        alt_comment_start: "",
+        multiline_comment_start: "=pod",
+        multiline_comment_end: "=cut",
+        multiline_strings: &[],
+        quotes: "\"'`",
+        directive_prefix: "",
+        annotation_prefixes: &[],
+        variable_prefixes: "$@%",
+        ident_chars: "",
+        operators: "+-*/%=<>!&|^~?:",
+        line_rules: &[],
+        flags: HighlightFlags::NUMBERS
+            .union(HighlightFlags::STRINGS)
+            .union(HighlightFlags::FUNCTIONS),
     }
 }

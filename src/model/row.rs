@@ -10,6 +10,13 @@ pub enum Highlight {
     String,
     Number,
     Match,
+    Type,
+    Function,
+    Constant,
+    Operator,
+    Preprocessor,
+    Variable,
+    Escape,
 }
 
 pub struct Row {
@@ -18,6 +25,7 @@ pub struct Row {
     render_byte_offsets: Vec<usize>,
     hl: Vec<Highlight>,
     pub hl_open_comment: bool,
+    pub hl_open_string: u8,
     pub idx: usize,
 }
 
@@ -42,6 +50,7 @@ impl Row {
             render_byte_offsets: Vec::new(),
             hl: Vec::new(),
             hl_open_comment: false,
+            hl_open_string: 0,
             idx: 0,
         };
         row.update_render();

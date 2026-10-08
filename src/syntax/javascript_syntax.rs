@@ -3,7 +3,7 @@ use super::{HighlightFlags, Syntax};
 pub fn javascript_syntax() -> Syntax {
     Syntax {
         filetype: "javascript",
-        filematch: &[".js", ".jsx", ".ts", ".tsx", ".mjs"],
+        filematch: &[".js", ".jsx", ".mjs", ".cjs"],
         keywords: &[
             "function",
             "return",
@@ -51,23 +51,11 @@ pub fn javascript_syntax() -> Syntax {
             "console|",
             "document|",
             "window|",
-            "Math|",
-            "JSON|",
-            "Array|",
-            "Object|",
-            "Promise|",
-            "Map|",
-            "Set|",
-            "Symbol|",
             "parseInt|",
             "parseFloat|",
             "let|",
             "const|",
             "var|",
-            "true|",
-            "false|",
-            "null|",
-            "undefined|",
             "this|",
             "number|",
             "string|",
@@ -75,9 +63,36 @@ pub fn javascript_syntax() -> Syntax {
             "any|",
             "void|",
         ],
+        types: &[
+            "Array", "Object", "String", "Number", "Boolean", "Map", "Set", "Promise", "Date",
+            "RegExp", "Error", "Symbol", "BigInt", "Function", "JSON", "Math", "Intl", "WeakMap",
+            "WeakSet", "Proxy", "Reflect", "Buffer",
+        ],
+        constants: &[
+            "true",
+            "false",
+            "null",
+            "undefined",
+            "NaN",
+            "Infinity",
+            "globalThis",
+        ],
         singleline_comment_start: "//",
+        alt_comment_start: "",
         multiline_comment_start: "/*",
         multiline_comment_end: "*/",
-        flags: HighlightFlags::NUMBERS.union(HighlightFlags::STRINGS),
+        multiline_strings: &[("`", "`")],
+        quotes: "\"'",
+        directive_prefix: "",
+        annotation_prefixes: &["@"],
+        variable_prefixes: "",
+        ident_chars: "",
+        operators: "+-*/%=<>!&|^~?:",
+        line_rules: &[],
+        flags: HighlightFlags::NUMBERS
+            .union(HighlightFlags::STRINGS)
+            .union(HighlightFlags::FUNCTIONS)
+            .union(HighlightFlags::CAPITALIZED_TYPES)
+            .union(HighlightFlags::UPPER_CONSTANTS),
     }
 }

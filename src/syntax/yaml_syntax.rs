@@ -1,13 +1,33 @@
 use super::{HighlightFlags, Syntax};
+use crate::model::row::Highlight;
 
 pub fn yaml_syntax() -> Syntax {
     Syntax {
         filetype: "yaml",
         filematch: &[".yaml", ".yml"],
-        keywords: &["true|", "false|", "null|", "yes|", "no|"],
+        keywords: &[],
+        types: &[],
+        constants: &[
+            "true", "false", "null", "yes", "no", "on", "off", "True", "False", "Null", "~",
+        ],
         singleline_comment_start: "#",
+        alt_comment_start: "",
         multiline_comment_start: "",
         multiline_comment_end: "",
-        flags: HighlightFlags::NUMBERS.union(HighlightFlags::STRINGS),
+        multiline_strings: &[],
+        quotes: "\"'",
+        directive_prefix: "",
+        annotation_prefixes: &["!!"],
+        variable_prefixes: "&*",
+        ident_chars: "",
+        operators: "",
+        line_rules: &[
+            ("---", Highlight::Preprocessor),
+            ("...", Highlight::Preprocessor),
+        ],
+        flags: HighlightFlags::NUMBERS
+            .union(HighlightFlags::STRINGS)
+            .union(HighlightFlags::KEY_VALUES)
+            .union(HighlightFlags::KEY_STRINGS),
     }
 }

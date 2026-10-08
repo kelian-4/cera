@@ -8,6 +8,13 @@ pub fn highlight_to_rgb(hl: Highlight, theme: &ThemeColors) -> u32 {
         Highlight::Keyword2 => theme.keyword2,
         Highlight::String => theme.string_color,
         Highlight::Number => theme.number,
+        Highlight::Type => theme.type_color,
+        Highlight::Function => theme.function_color,
+        Highlight::Constant => theme.constant,
+        Highlight::Operator => theme.operator,
+        Highlight::Preprocessor => theme.preprocessor,
+        Highlight::Variable => theme.variable,
+        Highlight::Escape => theme.escape,
         Highlight::Match => theme.match_color,
         Highlight::Normal => theme.normal,
     }
