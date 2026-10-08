@@ -11,12 +11,10 @@ fn matches_at(chars: &[char], i: usize, pat: &str) -> bool {
     if pat.is_empty() {
         return false;
     }
-    let mut idx = i;
-    for p in pat.chars() {
+    for (idx, p) in (i..).zip(pat.chars()) {
         if idx >= chars.len() || chars[idx] != p {
             return false;
         }
-        idx += 1;
     }
     true
 }
