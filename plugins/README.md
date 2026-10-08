@@ -51,6 +51,19 @@ mon-plugin/
   titre informatif ; c'est bien ce raccourci qui declenche le plugin dans
   Cera.
 
+## Coloration syntaxique
+
+Les langages sont definis dans `src/syntax/` pour l'editeur. Le fichier
+`plugins/pretty-cat/languages.json` en est la copie utilisee par
+`pretty-cat`, et le moteur de coloration de `plugins/pretty-cat/main.py`
+reproduit celui de `src/syntax/engine.rs`. Les tests de
+`src/syntax/parity_tests.rs` verifient que les donnees sont identiques et
+que les deux colorent a l'identique les echantillons de chaque langage
+ainsi que les fichiers du projet (ils demandent `python3`). Une classe de
+couleur par defaut se change dans la section `theme` de `config.json`
+pour l'editeur (`type`, `function`, `constant`, `operator`,
+`preprocessor`, `variable`, `escape`, en plus des couleurs existantes).
+
 ## Langages testes
 
 Un plugin peut etre ecrit dans n'importe quel langage capable de lire
@@ -136,8 +149,13 @@ n'est pas lu par Cera).
   clavier (Haut/Bas pour se deplacer, Entree pour ouvrir un fichier ou
   plier/deplier un dossier, Droite/Gauche pour deplier/replier).
 - **pretty-cat** (`cera -a fichier...`) : affiche un fichier en lecture seule avec
-  numeros de ligne et coloration syntaxique basique (Haut/Bas/PageUp/
-  PageDown pour faire defiler).
+  numeros de ligne et coloration syntaxique (Haut/Bas/PageUp/PageDown pour
+  faire defiler). Il colore les memes 70 langages que l'editeur (dont Nix,
+  Rust, C, C++, Python, JavaScript), avec les memes couleurs par defaut :
+  mots-clefs, types, fonctions, constantes, operateurs, directives,
+  variables, chaines (y compris multi-lignes), sequences d'echappement,
+  nombres et commentaires. Ses definitions de langages sont lues dans
+  `languages.json`, a cote de `main.py`.
 
 - **finder** (`cera -f nom`) : cherche recursivement, depuis le repertoire
   courant, les fichiers dont le nom contient `nom` (sans tenir compte de

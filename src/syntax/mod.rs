@@ -250,4 +250,6 @@ pub fn build_database() -> Vec<Syntax> {
 #[cfg(test)]
 mod language_samples;
 #[cfg(test)]
+mod parity_tests;
+#[cfg(test)]
 mod tests;
