@@ -1,12 +1,16 @@
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::os::fd::AsFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use nix::poll::{poll, PollFd, PollFlags};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use nix::sys::termios::{
     self, InputFlags, LocalFlags, OutputFlags, SetArg, SpecialCharacterIndices,
 };
+
+const LONE_ESCAPE_TIMEOUT_MS: u16 = 30;
+const ESCAPE_SEQUENCE_TIMEOUT_MS: u16 = 100;
 
 pub const NO_KEY: i32 = -2;
 pub const BACKSPACE: i32 = 127;
@@ -159,11 +163,29 @@ impl Terminal {
 
     fn read_byte_raw(&self) -> io::Result<Option<u8>> {
         let mut buf = [0u8; 1];
-        match io::stdin().read(&mut buf) {
+        match nix::unistd::read(libc::STDIN_FILENO, &mut buf) {
             Ok(0) => Ok(None),
             Ok(_) => Ok(Some(buf[0])),
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(e) => Err(e),
+            Err(errno) => {
+                let error = io::Error::from(errno);
+                if error.kind() == io::ErrorKind::WouldBlock {
+                    Ok(None)
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+
+    fn wait_for_input(&self, timeout_ms: u16) -> bool {
+        let stdin = io::stdin();
+        let mut fds = [PollFd::new(&stdin, PollFlags::POLLIN)];
+        loop {
+            match poll(&mut fds, i32::from(timeout_ms)) {
+                Ok(ready) => return ready > 0,
+                Err(nix::errno::Errno::EINTR) => continue,
+                Err(_) => return false,
+            }
         }
     }
 
@@ -196,14 +218,11 @@ impl Terminal {
         Ok((rows, cols))
     }
 
-    fn read_byte_after_escape(&self) -> io::Result<Option<u8>> {
-        for _ in 0..20 {
-            if let Some(b) = self.read_byte_raw()? {
-                return Ok(Some(b));
-            }
-            std::thread::sleep(std::time::Duration::from_millis(1));
+    fn read_byte_after_escape(&self, timeout_ms: u16) -> io::Result<Option<u8>> {
+        if !self.wait_for_input(timeout_ms) {
+            return Ok(None);
         }
-        Ok(None)
+        self.read_byte_raw()
     }
 
     pub fn read_key(&mut self) -> io::Result<i32> {
@@ -213,11 +232,11 @@ impl Terminal {
         };
 
         if first == 0x1b {
-            let seq0 = match self.read_byte_after_escape()? {
+            let seq0 = match self.read_byte_after_escape(LONE_ESCAPE_TIMEOUT_MS)? {
                 Some(b) => b,
                 None => return Ok(0x1b),
             };
-            let seq1 = match self.read_byte_after_escape()? {
+            let seq1 = match self.read_byte_after_escape(ESCAPE_SEQUENCE_TIMEOUT_MS)? {
                 Some(b) => b,
                 None => return Ok(0x1b),
             };
