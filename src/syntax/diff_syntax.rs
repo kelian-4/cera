@@ -29,6 +29,9 @@ pub fn diff_syntax() -> Syntax {
             ("-", Highlight::Constant),
             ("\\", Highlight::Comment),
         ],
+        aliases: &["patch"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::empty(),
     }
 }

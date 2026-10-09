@@ -33,6 +33,9 @@ pub fn ini_syntax() -> Syntax {
         ident_chars: "",
         operators: "",
         line_rules: &[("[", Highlight::Keyword1)],
+        aliases: &["conf", "cfg", "properties"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::KEY_VALUES),

@@ -245,6 +245,7 @@ fn pretty_cat_language_data_matches_the_editor() {
         ("char_literals", HighlightFlags::CHAR_LITERALS),
         ("tick_strings", HighlightFlags::TICK_STRINGS),
         ("css_values", HighlightFlags::CSS_VALUES),
+        ("fences", HighlightFlags::FENCES),
     ];
 
     for (entry, syntax) in entries.iter().zip(database.iter()) {
@@ -305,6 +306,35 @@ fn pretty_cat_language_data_matches_the_editor() {
         );
         assert_eq!(field("ident_chars"), syntax.ident_chars, "{name}");
         assert_eq!(field("operators"), syntax.operators, "{name}");
+
+        assert_eq!(
+            strings(entry.get("aliases")),
+            owned(syntax.aliases),
+            "{name} aliases"
+        );
+        assert_eq!(
+            strings(entry.get("string_embeds")),
+            owned(syntax.string_embeds),
+            "{name} string embeds"
+        );
+        let json_tags: Vec<(String, String)> = entry
+            .get("embed_tags")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .map(|pair| {
+                        let pair = pair.as_array().unwrap();
+                        (pair[0].as_string(""), pair[1].as_string(""))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let rust_tags: Vec<(String, String)> = syntax
+            .embed_tags
+            .iter()
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .collect();
+        assert_eq!(json_tags, rust_tags, "{name} embed tags");
 
         let json_strings: Vec<(String, String)> = entry
             .get("multiline_strings")

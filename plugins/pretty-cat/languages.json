@@ -113,7 +113,10 @@
    "strings",
    "functions",
    "upper_constants"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "cpp",
@@ -250,7 +253,15 @@
    "functions",
    "capitalized_types",
    "upper_constants"
-  ]
+  ],
+  "aliases": [
+   "c++",
+   "cc",
+   "cxx",
+   "hpp"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "python",
@@ -365,6 +376,15 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "py",
+   "python3"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -492,6 +512,16 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "js",
+   "node",
+   "jsx"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -624,6 +654,14 @@
    "capitalized_types",
    "upper_constants",
    "char_literals"
+  ],
+  "aliases": [
+   "rs"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -722,6 +760,14 @@
    "strings",
    "functions",
    "capitalized_types"
+  ],
+  "aliases": [
+   "golang"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -833,6 +879,12 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -948,6 +1000,15 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "cs",
+   "c#"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -1044,6 +1105,14 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "rb"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -1148,6 +1217,12 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -1263,6 +1338,12 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -1370,6 +1451,14 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "kt"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -1444,7 +1533,16 @@
    "numbers",
    "strings",
    "functions"
-  ]
+  ],
+  "aliases": [
+   "bash",
+   "sh",
+   "zsh",
+   "console",
+   "shellscript"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "sql",
@@ -1552,7 +1650,15 @@
    "strings",
    "functions",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [
+   "mysql",
+   "postgresql",
+   "sqlite",
+   "plsql"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "yaml",
@@ -1603,7 +1709,12 @@
    "strings",
    "key_values",
    "key_strings"
-  ]
+  ],
+  "aliases": [
+   "yml"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "json",
@@ -1633,7 +1744,12 @@
    "numbers",
    "strings",
    "key_strings"
-  ]
+  ],
+  "aliases": [
+   "jsonc"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "lua",
@@ -1692,6 +1808,12 @@
    "numbers",
    "strings",
    "functions"
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -1746,6 +1868,12 @@
    "numbers",
    "strings",
    "functions"
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -1817,7 +1945,12 @@
    "strings",
    "capitalized_types",
    "char_literals"
-  ]
+  ],
+  "aliases": [
+   "hs"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "r",
@@ -1869,7 +2002,12 @@
    "numbers",
    "strings",
    "functions"
-  ]
+  ],
+  "aliases": [
+   "rscript"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "zig",
@@ -1958,7 +2096,10 @@
    "strings",
    "functions",
    "capitalized_types"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "html",
@@ -1984,7 +2125,22 @@
   "flags": [
    "strings",
    "markup"
-  ]
+  ],
+  "aliases": [
+   "htm",
+   "xhtml"
+  ],
+  "embed_tags": [
+   [
+    "script",
+    "javascript"
+   ],
+   [
+    "style",
+    "css"
+   ]
+  ],
+  "string_embeds": []
  },
  {
   "filetype": "css",
@@ -2057,7 +2213,10 @@
    "strings",
    "functions",
    "css_values"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "markdown",
@@ -2107,8 +2266,14 @@
    ]
   ],
   "flags": [
-   "strings"
-  ]
+   "strings",
+   "fences"
+  ],
+  "aliases": [
+   "md"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "typescript",
@@ -2238,6 +2403,15 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "ts",
+   "tsx"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -2361,6 +2535,12 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -2479,6 +2659,12 @@
    "capitalized_types",
    "upper_constants",
    "char_literals"
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -2597,7 +2783,12 @@
    "capitalized_types",
    "upper_constants",
    "tick_strings"
-  ]
+  ],
+  "aliases": [
+   "jl"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "elixir",
@@ -2682,6 +2873,14 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "ex"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -2745,7 +2944,12 @@
    "numbers",
    "strings",
    "functions"
-  ]
+  ],
+  "aliases": [
+   "erl"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "clojure",
@@ -2824,7 +3028,12 @@
    "numbers",
    "strings",
    "paren_calls"
-  ]
+  ],
+  "aliases": [
+   "clj"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "ocaml",
@@ -2924,7 +3133,12 @@
    "strings",
    "capitalized_types",
    "char_literals"
-  ]
+  ],
+  "aliases": [
+   "ml"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "fsharp",
@@ -3054,7 +3268,12 @@
    "functions",
    "capitalized_types",
    "char_literals"
-  ]
+  ],
+  "aliases": [
+   "fs"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "powershell",
@@ -3144,7 +3363,13 @@
    "strings",
    "functions",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [
+   "ps1",
+   "pwsh"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "groovy",
@@ -3268,6 +3493,14 @@
    "functions",
    "capitalized_types",
    "upper_constants"
+  ],
+  "aliases": [
+   "gradle"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -3362,7 +3595,12 @@
    "strings",
    "functions",
    "tick_strings"
-  ]
+  ],
+  "aliases": [
+   "octave"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "fortran",
@@ -3468,7 +3706,10 @@
    "strings",
    "functions",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "pascal",
@@ -3585,7 +3826,10 @@
    "strings",
    "functions",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "ada",
@@ -3701,7 +3945,10 @@
    "functions",
    "char_literals",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "cobol",
@@ -3821,7 +4068,10 @@
    "numbers",
    "strings",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "assembly",
@@ -3989,7 +4239,13 @@
    "strings",
    "functions",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [
+   "asm",
+   "nasm"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "visualbasic",
@@ -4157,7 +4413,12 @@
    "strings",
    "functions",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [
+   "vb"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "lisp",
@@ -4239,7 +4500,10 @@
    "numbers",
    "strings",
    "paren_calls"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "scheme",
@@ -4303,7 +4567,10 @@
    "numbers",
    "strings",
    "paren_calls"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "nim",
@@ -4435,7 +4702,10 @@
    "functions",
    "capitalized_types",
    "upper_constants"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "crystal",
@@ -4550,7 +4820,10 @@
    "functions",
    "capitalized_types",
    "upper_constants"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "d",
@@ -4688,7 +4961,12 @@
    "functions",
    "capitalized_types",
    "upper_constants"
-  ]
+  ],
+  "aliases": [
+   "dlang"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "tcl",
@@ -4802,7 +5080,10 @@
   "flags": [
    "numbers",
    "strings"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "awk",
@@ -4874,7 +5155,10 @@
    "numbers",
    "strings",
    "functions"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "solidity",
@@ -4997,7 +5281,10 @@
    "functions",
    "capitalized_types",
    "upper_constants"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "verilog",
@@ -5141,7 +5428,10 @@
    "numbers",
    "strings",
    "functions"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "vhdl",
@@ -5287,7 +5577,10 @@
    "functions",
    "char_literals",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "coffeescript",
@@ -5376,6 +5669,14 @@
    "strings",
    "functions",
    "capitalized_types"
+  ],
+  "aliases": [
+   "coffee"
+  ],
+  "embed_tags": [],
+  "string_embeds": [
+   "html",
+   "sql"
   ]
  },
  {
@@ -5449,7 +5750,10 @@
    "strings",
    "capitalized_types",
    "char_literals"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "vim",
@@ -5526,7 +5830,12 @@
    "numbers",
    "strings",
    "functions"
-  ]
+  ],
+  "aliases": [
+   "viml"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "prolog",
@@ -5586,7 +5895,10 @@
    "numbers",
    "strings",
    "functions"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "fish",
@@ -5647,7 +5959,10 @@
   "flags": [
    "numbers",
    "strings"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "nix",
@@ -5718,7 +6033,10 @@
    "strings",
    "functions",
    "key_values"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "toml",
@@ -5764,7 +6082,10 @@
    "strings",
    "key_values",
    "key_strings"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "ini",
@@ -5813,7 +6134,14 @@
    "numbers",
    "strings",
    "key_values"
-  ]
+  ],
+  "aliases": [
+   "conf",
+   "cfg",
+   "properties"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "xml",
@@ -5854,7 +6182,12 @@
   "flags": [
    "strings",
    "markup"
-  ]
+  ],
+  "aliases": [
+   "svg"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "latex",
@@ -5887,7 +6220,12 @@
   "line_rules": [],
   "flags": [
    "strings"
-  ]
+  ],
+  "aliases": [
+   "tex"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "diff",
@@ -5943,7 +6281,12 @@
     "Comment"
    ]
   ],
-  "flags": []
+  "flags": [],
+  "aliases": [
+   "patch"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "hcl",
@@ -6042,7 +6385,13 @@
    "strings",
    "functions",
    "key_values"
-  ]
+  ],
+  "aliases": [
+   "terraform",
+   "tf"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "protobuf",
@@ -6113,7 +6462,12 @@
    "functions",
    "capitalized_types",
    "upper_constants"
-  ]
+  ],
+  "aliases": [
+   "proto"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "graphql",
@@ -6176,7 +6530,12 @@
    "strings",
    "functions",
    "capitalized_types"
-  ]
+  ],
+  "aliases": [
+   "gql"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "scss",
@@ -6214,7 +6573,13 @@
    "strings",
    "functions",
    "css_values"
-  ]
+  ],
+  "aliases": [
+   "sass",
+   "less"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "makefile",
@@ -6259,7 +6624,12 @@
    "numbers",
    "strings",
    "key_values"
-  ]
+  ],
+  "aliases": [
+   "make"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "cmake",
@@ -6354,7 +6724,10 @@
    "strings",
    "functions",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [],
+  "embed_tags": [],
+  "string_embeds": []
  },
  {
   "filetype": "dockerfile",
@@ -6402,6 +6775,11 @@
    "numbers",
    "strings",
    "case_insensitive"
-  ]
+  ],
+  "aliases": [
+   "docker"
+  ],
+  "embed_tags": [],
+  "string_embeds": []
  }
 ]

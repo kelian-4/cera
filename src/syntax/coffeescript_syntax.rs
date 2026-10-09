@@ -64,6 +64,9 @@ pub fn coffeescript_syntax() -> Syntax {
         ident_chars: "",
         operators: "+-*/%=<>!&|^~?:",
         line_rules: &[],
+        aliases: &["coffee"],
+        embed_tags: &[],
+        string_embeds: &["html", "sql"],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS)

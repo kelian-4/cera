@@ -113,6 +113,9 @@ pub fn cpp_syntax() -> Syntax {
         ident_chars: "",
         operators: "+-*/%=<>!&|^~?:",
         line_rules: &[],
+        aliases: &["c++", "cc", "cxx", "hpp"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS)

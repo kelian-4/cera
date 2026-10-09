@@ -51,6 +51,9 @@ pub fn erlang_syntax() -> Syntax {
         ident_chars: "",
         operators: "+-*/%=<>!&|^~?:",
         line_rules: &[],
+        aliases: &["erl"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS),

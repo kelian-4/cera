@@ -27,6 +27,9 @@ pub fn haskell_syntax() -> Syntax {
         ident_chars: "'",
         operators: "+-*/=<>!&|^~$",
         line_rules: &[],
+        aliases: &["hs"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::CAPITALIZED_TYPES)

@@ -68,6 +68,9 @@ pub fn lisp_syntax() -> Syntax {
         ident_chars: "-?!*<>=+/",
         operators: "",
         line_rules: &[],
+        aliases: &[],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::PAREN_CALLS),

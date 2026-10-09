@@ -22,6 +22,9 @@ pub fn xml_syntax() -> Syntax {
         ident_chars: "",
         operators: "",
         line_rules: &[],
+        aliases: &["svg"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::STRINGS.union(HighlightFlags::MARKUP),
     }
 }

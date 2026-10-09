@@ -1,5 +1,16 @@
 use super::utf8;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HlState {
+    pub comment: bool,
+    pub string: u8,
+    pub embed: u8,
+    pub embed_end: u8,
+    pub inner_comment: bool,
+    pub inner_string: u8,
+    pub undecided: bool,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Highlight {
     Normal,
@@ -24,8 +35,7 @@ pub struct Row {
     render: String,
     render_byte_offsets: Vec<usize>,
     hl: Vec<Highlight>,
-    pub hl_open_comment: bool,
-    pub hl_open_string: u8,
+    pub hl_state: HlState,
     pub idx: usize,
 }
 
@@ -49,8 +59,7 @@ impl Row {
             render: String::new(),
             render_byte_offsets: Vec::new(),
             hl: Vec::new(),
-            hl_open_comment: false,
-            hl_open_string: 0,
+            hl_state: HlState::default(),
             idx: 0,
         };
         row.update_render();

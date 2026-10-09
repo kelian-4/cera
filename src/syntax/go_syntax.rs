@@ -80,6 +80,9 @@ pub fn go_syntax() -> Syntax {
         ident_chars: "",
         operators: "+-*/%=<>!&|^~?:",
         line_rules: &[],
+        aliases: &["golang"],
+        embed_tags: &[],
+        string_embeds: &["html", "sql"],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS)

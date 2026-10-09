@@ -84,6 +84,9 @@ pub fn typescript_syntax() -> Syntax {
         ident_chars: "",
         operators: "+-*/%=<>!&|^~?:",
         line_rules: &[],
+        aliases: &["ts", "tsx"],
+        embed_tags: &[],
+        string_embeds: &["html", "sql"],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS)

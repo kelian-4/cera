@@ -34,6 +34,9 @@ pub fn r_syntax() -> Syntax {
         ident_chars: ".",
         operators: "+-*/^=<>!&|~?:%$@",
         line_rules: &[],
+        aliases: &["rscript"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS),

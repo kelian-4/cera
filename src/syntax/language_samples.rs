@@ -956,17 +956,162 @@ pub const SAMPLES: &[Sample] = &[
             (1, "$HOME", Highlight::Variable),
         ],
     },
+    Sample {
+        file: "page.html",
+        filetype: "html",
+        lines: &[
+            "<script type=\"x\">",
+            "const n = 42; // c",
+            "</script>",
+            "<style>a { margin: 10px; }</style>",
+            "<p>text</p>",
+        ],
+        expect: &[
+            (0, "<script", Highlight::Keyword1),
+            (0, "type", Highlight::Type),
+            (1, "const", Highlight::Keyword2),
+            (1, "42", Highlight::Number),
+            (1, "// c", Highlight::Comment),
+            (2, "</script", Highlight::Keyword1),
+            (3, "a", Highlight::Type),
+            (3, "10px", Highlight::Number),
+            (3, "</style", Highlight::Keyword1),
+            (4, "<p", Highlight::Keyword1),
+        ],
+    },
+    Sample {
+        file: "t.py",
+        filetype: "python",
+        lines: &[
+            "page = \"\"\"<div class=\"a\">hi &amp; bye</div>",
+            "<script>var x = 1;</script>\"\"\"",
+            "y = 2",
+        ],
+        expect: &[
+            (0, "<div", Highlight::Keyword1),
+            (0, "class", Highlight::Type),
+            (0, "\"a\"", Highlight::String),
+            (0, "&amp;", Highlight::Escape),
+            (0, "</div", Highlight::Keyword1),
+            (1, "<script", Highlight::Keyword1),
+            (1, "var", Highlight::Normal),
+            (1, "\"\"\"", Highlight::String),
+            (2, "y", Highlight::Normal),
+            (2, "2", Highlight::Number),
+        ],
+    },
+    Sample {
+        file: "u.py",
+        filetype: "python",
+        lines: &[
+            "q = \"\"\"",
+            "  <p>hi</p>",
+            "\"\"\"",
+            "def f():",
+            "    \"\"\"Select the best from list\"\"\"",
+        ],
+        expect: &[
+            (1, "<p", Highlight::Keyword1),
+            (1, "</p", Highlight::Keyword1),
+            (2, "\"\"\"", Highlight::String),
+            (3, "def", Highlight::Keyword1),
+            (4, "Select", Highlight::String),
+            (4, "from", Highlight::String),
+        ],
+    },
+    Sample {
+        file: "v.py",
+        filetype: "python",
+        lines: &[
+            "q = \"SELECT id FROM t WHERE n = 1\"",
+            "x = '<b class=\"c\">y</b>'",
+        ],
+        expect: &[
+            (0, "\"", Highlight::String),
+            (0, "SELECT", Highlight::Keyword1),
+            (0, "FROM", Highlight::Keyword1),
+            (0, "WHERE", Highlight::Keyword1),
+            (0, "1", Highlight::Number),
+            (1, "<b", Highlight::Keyword1),
+            (1, "class", Highlight::Type),
+            (1, "\"c\"", Highlight::String),
+            (1, "</b", Highlight::Keyword1),
+        ],
+    },
+    Sample {
+        file: "w.js",
+        filetype: "javascript",
+        lines: &["const t = `<ul><li>${x}</li></ul>`;"],
+        expect: &[
+            (0, "<ul", Highlight::Keyword1),
+            (0, "</li", Highlight::Keyword1),
+            (0, "</ul", Highlight::Keyword1),
+        ],
+    },
+    Sample {
+        file: "x.rs",
+        filetype: "rust",
+        lines: &["let q = \"SELECT * FROM t\";"],
+        expect: &[
+            (0, "SELECT", Highlight::Keyword1),
+            (0, "FROM", Highlight::Keyword1),
+        ],
+    },
+    Sample {
+        file: "n.md",
+        filetype: "markdown",
+        lines: &[
+            "# T",
+            "```python",
+            "def f(x):",
+            "    return 1",
+            "```",
+            "```text",
+            "# not a heading",
+            "```",
+            "end",
+        ],
+        expect: &[
+            (0, "# T", Highlight::Keyword1),
+            (1, "```python", Highlight::String),
+            (2, "def", Highlight::Keyword1),
+            (3, "return", Highlight::Keyword1),
+            (3, "1", Highlight::Number),
+            (4, "```", Highlight::String),
+            (6, "# not a heading", Highlight::String),
+            (8, "end", Highlight::Normal),
+        ],
+    },
+    Sample {
+        file: "m.md",
+        filetype: "markdown",
+        lines: &[
+            "```js",
+            "const a = 1;",
+            "```",
+            "```yaml",
+            "name: x",
+            "```",
+            "```sh",
+            "echo $HOME",
+            "```",
+        ],
+        expect: &[
+            (1, "const", Highlight::Keyword2),
+            (1, "1", Highlight::Number),
+            (4, "name", Highlight::Type),
+            (7, "$HOME", Highlight::Variable),
+        ],
+    },
 ];
 
 pub fn highlight_lines(syntax: &Syntax, lines: &[&str]) -> Vec<Vec<Highlight>> {
     let mut result = Vec::new();
-    let mut open_comment = false;
-    let mut open_string = 0u8;
+    let mut state = crate::model::row::HlState::default();
     for line in lines {
         let chars: Vec<char> = line.chars().collect();
-        let row = engine::highlight_row(&chars, syntax, open_comment, open_string);
-        open_comment = row.open_comment;
-        open_string = row.open_string;
+        let row = engine::highlight_row(&chars, syntax, state);
+        state = row.state;
         result.push(row.hl);
     }
     result

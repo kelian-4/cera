@@ -66,6 +66,9 @@ pub fn vim_syntax() -> Syntax {
         ident_chars: "",
         operators: "",
         line_rules: &[],
+        aliases: &["viml"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS),

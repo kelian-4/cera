@@ -71,7 +71,7 @@ pub mod yaml_syntax;
 pub mod zig_syntax;
 
 use crate::model::buffer::Buffer;
-use crate::model::row::Highlight;
+use crate::model::row::{Highlight, HlState};
 
 bitflags::bitflags! {
     #[derive(Clone, Copy)]
@@ -89,6 +89,7 @@ bitflags::bitflags! {
         const CHAR_LITERALS = 1 << 10;
         const TICK_STRINGS = 1 << 11;
         const CSS_VALUES = 1 << 12;
+        const FENCES = 1 << 13;
     }
 }
 
@@ -110,6 +111,9 @@ pub struct Syntax {
     pub ident_chars: &'static str,
     pub operators: &'static str,
     pub line_rules: &'static [(&'static str, Highlight)],
+    pub aliases: &'static [&'static str],
+    pub embed_tags: &'static [(&'static str, &'static str)],
+    pub string_embeds: &'static [&'static str],
     pub flags: HighlightFlags,
 }
 
@@ -145,13 +149,12 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
     };
 
     let render: Vec<char> = buffer.row(row_idx).render().chars().collect();
-    let previous_comment = row_idx > 0 && buffer.row(row_idx - 1).hl_open_comment;
-    let previous_string = if row_idx > 0 {
-        buffer.row(row_idx - 1).hl_open_string
+    let previous = if row_idx > 0 {
+        buffer.row(row_idx - 1).hl_state
     } else {
-        0
+        HlState::default()
     };
-    let result = engine::highlight_row(&render, syntax, previous_comment, previous_string);
+    let result = engine::highlight_row(&render, syntax, previous);
 
     for (idx, kind) in result.hl.into_iter().enumerate() {
         if let Some(slot) = buffer.row_mut(row_idx).hl_mut().get_mut(idx) {
@@ -159,10 +162,8 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
         }
     }
 
-    let changed = buffer.row(row_idx).hl_open_comment != result.open_comment
-        || buffer.row(row_idx).hl_open_string != result.open_string;
-    buffer.row_mut(row_idx).hl_open_comment = result.open_comment;
-    buffer.row_mut(row_idx).hl_open_string = result.open_string;
+    let changed = buffer.row(row_idx).hl_state != result.state;
+    buffer.row_mut(row_idx).hl_state = result.state;
     if changed && row_idx + 1 < buffer.num_rows() {
         update_syntax(buffer, row_idx + 1, Some(syntax));
     }
@@ -170,6 +171,11 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
 
 pub fn select_for_filename<'a>(database: &'a [Syntax], filename: &str) -> Option<&'a Syntax> {
     database.iter().find(|s| matches(s, filename))
+}
+
+pub fn database() -> &'static [Syntax] {
+    static DATABASE: std::sync::OnceLock<Vec<Syntax>> = std::sync::OnceLock::new();
+    DATABASE.get_or_init(build_database)
 }
 
 pub fn build_database() -> Vec<Syntax> {

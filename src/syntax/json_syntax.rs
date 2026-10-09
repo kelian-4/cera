@@ -19,6 +19,9 @@ pub fn json_syntax() -> Syntax {
         ident_chars: "",
         operators: "",
         line_rules: &[],
+        aliases: &["jsonc"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::KEY_STRINGS),

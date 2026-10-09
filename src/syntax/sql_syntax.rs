@@ -96,6 +96,9 @@ pub fn sql_syntax() -> Syntax {
         ident_chars: "",
         operators: "+-*/%=<>!|",
         line_rules: &[],
+        aliases: &["mysql", "postgresql", "sqlite", "plsql"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS)

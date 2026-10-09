@@ -25,6 +25,9 @@ pub fn markdown_syntax() -> Syntax {
             ("#", Highlight::Keyword1),
             (">", Highlight::Comment),
         ],
-        flags: HighlightFlags::STRINGS,
+        aliases: &["md"],
+        embed_tags: &[],
+        string_embeds: &[],
+        flags: HighlightFlags::STRINGS.union(HighlightFlags::FENCES),
     }
 }

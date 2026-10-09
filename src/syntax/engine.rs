@@ -1,10 +1,9 @@
 use super::{HighlightFlags, Syntax};
-use crate::model::row::Highlight;
+use crate::model::row::{Highlight, HlState};
 
 pub struct RowHighlight {
     pub hl: Vec<Highlight>,
-    pub open_comment: bool,
-    pub open_string: u8,
+    pub state: HlState,
 }
 
 fn matches_at(chars: &[char], i: usize, pat: &str) -> bool {
@@ -340,29 +339,286 @@ fn key_value_span(chars: &[char], from: Option<usize>) -> Option<(usize, usize)>
     }
 }
 
-pub fn highlight_row(
+fn language_by_name(name: &str) -> Option<(u8, &'static Syntax)> {
+    let wanted = name.to_ascii_lowercase();
+    if wanted.is_empty() {
+        return None;
+    }
+    let database = super::database();
+    let index = database
+        .iter()
+        .position(|s| s.filetype == wanted)
+        .or_else(|| {
+            database
+                .iter()
+                .position(|s| s.aliases.iter().any(|alias| *alias == wanted))
+        })?;
+    Some(((index + 1) as u8, &database[index]))
+}
+
+fn language_at(index_plus_one: u8) -> Option<&'static Syntax> {
+    super::database().get((index_plus_one as usize).checked_sub(1)?)
+}
+
+fn sniff_language(content: &[char], allowed: &[&str]) -> Option<&'static str> {
+    let start = content.iter().position(|c| !c.is_whitespace())?;
+    let rest = &content[start..];
+    if allowed.contains(&"html")
+        && rest[0] == '<'
+        && rest
+            .get(1)
+            .is_some_and(|c| c.is_alphabetic() || matches!(c, '!' | '/' | '?'))
+    {
+        return Some("html");
+    }
+    if allowed.contains(&"sql") {
+        let text: String = rest.iter().collect();
+        let word: String = text
+            .chars()
+            .take_while(|c| c.is_ascii_alphabetic())
+            .collect();
+        let lower = text.to_ascii_lowercase();
+        let uniform_case = word == word.to_ascii_uppercase() || word == word.to_ascii_lowercase();
+        let after = text[word.len()..].chars().next();
+        let starts_like_sql = matches!(
+            word.to_ascii_lowercase().as_str(),
+            "select" | "insert" | "update" | "delete" | "create" | "drop" | "alter"
+        );
+        let has_marker = [
+            " from ", " into ", " set ", " values", " table ", " where ", " join ",
+        ]
+        .iter()
+        .any(|marker| lower.contains(marker));
+        if starts_like_sql && uniform_case && after.is_some_and(|c| c.is_whitespace()) && has_marker
+        {
+            return Some("sql");
+        }
+    }
+    None
+}
+
+fn matches_closing_tag(render: &[char], at: usize, tag: &str) -> bool {
+    if render.get(at) != Some(&'<') || render.get(at + 1) != Some(&'/') {
+        return false;
+    }
+    let mut idx = at + 2;
+    for expected in tag.chars() {
+        match render.get(idx) {
+            Some(c) if c.eq_ignore_ascii_case(&expected) => idx += 1,
+            _ => return false,
+        }
+    }
+    !render.get(idx).is_some_and(|c| is_ident_char(*c, "-"))
+}
+
+fn region_terminator(
+    render: &[char],
+    start: usize,
+    state: &HlState,
+    host: &Syntax,
+) -> Option<usize> {
+    let n = render.len();
+    if state.embed_end == 0 {
+        let (_, end) = host
+            .multiline_strings
+            .get((state.string as usize).checked_sub(1)?)?;
+        (start..n).find(|&p| matches_at(render, p, end))
+    } else {
+        let (tag, _) = host.embed_tags.get(state.embed_end as usize - 1)?;
+        (start..n).find(|&p| matches_closing_tag(render, p, tag))
+    }
+}
+
+fn run_region(
+    render: &[char],
+    start: usize,
+    state: &mut HlState,
+    hl: &mut [Highlight],
+    host: &Syntax,
+) -> usize {
+    let n = render.len();
+    let Some(inner) = language_at(state.embed) else {
+        state.embed = 0;
+        state.embed_end = 0;
+        return start;
+    };
+    let terminator = region_terminator(render, start, state, host);
+    let stop = terminator.unwrap_or(n);
+    let inner_state = HlState {
+        comment: state.inner_comment,
+        string: state.inner_string,
+        ..HlState::default()
+    };
+    let result = highlight_row_inner(&render[start..stop], inner, inner_state, false);
+    for (offset, kind) in result.hl.into_iter().enumerate() {
+        hl[start + offset] = kind;
+    }
+    if terminator.is_some() {
+        state.embed = 0;
+        state.embed_end = 0;
+        state.inner_comment = false;
+        state.inner_string = 0;
+    } else {
+        state.inner_comment = result.state.comment;
+        state.inner_string = result.state.string;
+    }
+    stop
+}
+
+fn resolve_undecided_string(render: &[char], host: &Syntax, state: &mut HlState) {
+    let Some(first) = render.iter().position(|c| !c.is_whitespace()) else {
+        return;
+    };
+    state.undecided = false;
+    let Some((_, end)) = host
+        .multiline_strings
+        .get((state.string as usize).saturating_sub(1))
+    else {
+        return;
+    };
+    let terminator = (0..render.len()).find(|&p| matches_at(render, p, end));
+    if terminator.is_some_and(|t| t <= first) {
+        return;
+    }
+    let content_end = terminator.unwrap_or(render.len());
+    if let Some(name) = sniff_language(&render[..content_end], host.string_embeds) {
+        if let Some((index, _)) = language_by_name(name) {
+            state.embed = index;
+            state.embed_end = 0;
+        }
+    }
+}
+
+fn start_string_embed(
+    render: &[char],
+    from: usize,
+    state: &mut HlState,
+    hl: &mut [Highlight],
+    host: &Syntax,
+    delimiter: &str,
+) -> usize {
+    let n = render.len();
+    let Some((_, end)) = host
+        .multiline_strings
+        .get((state.string as usize).saturating_sub(1))
+    else {
+        return from;
+    };
+    let terminator = (from..n).find(|&p| matches_at(render, p, end));
+    if host.flags.contains(HighlightFlags::FENCES) && matches!(delimiter, "```" | "~~~") {
+        if terminator.is_some() {
+            return from;
+        }
+        let info: String = render[from..].iter().collect();
+        let word: String = info
+            .trim()
+            .trim_start_matches(['{', '.'])
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || matches!(c, '+' | '#' | '-' | '_'))
+            .collect();
+        fill(hl, from, n, Highlight::String);
+        if let Some((index, _)) = language_by_name(&word) {
+            state.embed = index;
+            state.embed_end = 0;
+        }
+        return n;
+    }
+    if host.string_embeds.is_empty() {
+        return from;
+    }
+    let content_end = terminator.unwrap_or(n);
+    if render[from..content_end].iter().all(|c| c.is_whitespace()) {
+        if terminator.is_none() {
+            state.undecided = true;
+        }
+        return from;
+    }
+    if let Some(name) = sniff_language(&render[from..content_end], host.string_embeds) {
+        if let Some((index, _)) = language_by_name(name) {
+            state.embed = index;
+            state.embed_end = 0;
+            return run_region(render, from, state, hl, host);
+        }
+    }
+    from
+}
+
+fn start_tag_embed(
+    render: &[char],
+    from: usize,
+    state: &mut HlState,
+    hl: &mut [Highlight],
+    host: &Syntax,
+    tag: &str,
+) -> usize {
+    let Some(rule) = host.embed_tags.iter().position(|(name, _)| *name == tag) else {
+        return from;
+    };
+    let Some((index, _)) = language_by_name(host.embed_tags[rule].1) else {
+        return from;
+    };
+    state.embed = index;
+    state.embed_end = (rule + 1) as u8;
+    run_region(render, from, state, hl, host)
+}
+
+fn single_line_string_embed(
+    render: &[char],
+    open: usize,
+    quote: char,
+    hl: &mut [Highlight],
+    host: &Syntax,
+) -> Option<usize> {
+    let n = render.len();
+    let mut close = open + 1;
+    while close < n && render[close] != quote {
+        if render[close] == '\\' {
+            close += 1;
+        }
+        close += 1;
+    }
+    let close = close.min(n);
+    let name = sniff_language(&render[open + 1..close], host.string_embeds)?;
+    let (_, inner) = language_by_name(name)?;
+    hl[open] = Highlight::String;
+    let result = highlight_row_inner(&render[open + 1..close], inner, HlState::default(), false);
+    for (offset, kind) in result.hl.into_iter().enumerate() {
+        hl[open + 1 + offset] = kind;
+    }
+    if close < n {
+        hl[close] = Highlight::String;
+        Some(close + 1)
+    } else {
+        Some(n)
+    }
+}
+
+pub fn highlight_row(render: &[char], syntax: &Syntax, incoming: HlState) -> RowHighlight {
+    highlight_row_inner(render, syntax, incoming, true)
+}
+
+fn highlight_row_inner(
     render: &[char],
     syntax: &Syntax,
-    in_comment: bool,
-    open_string: u8,
+    incoming: HlState,
+    allow_embeds: bool,
 ) -> RowHighlight {
     let n = render.len();
     let mut hl = vec![Highlight::Normal; n];
-    let mut in_comment = in_comment;
-    let mut ml_string = open_string;
+    let mut state = incoming;
     let flags = syntax.flags;
     let extra = syntax.ident_chars;
     let markup = flags.contains(HighlightFlags::MARKUP);
     let strings = flags.contains(HighlightFlags::STRINGS);
+    let mut open_tag: Option<String> = None;
 
-    if !in_comment && ml_string == 0 {
+    if !state.comment && state.string == 0 && state.embed == 0 {
         for (prefix, kind) in syntax.line_rules {
             if matches_at(render, 0, prefix) {
                 fill(&mut hl, 0, n, *kind);
                 return RowHighlight {
                     hl,
-                    open_comment: false,
-                    open_string: 0,
+                    state: HlState::default(),
                 };
             }
         }
@@ -377,12 +633,22 @@ pub fn highlight_row(
         && first_non_space.is_some_and(|at| matches_at(render, at, syntax.directive_prefix));
     if flags.contains(HighlightFlags::KEY_VALUES)
         && !starts_with_directive
-        && !in_comment
-        && ml_string == 0
+        && !state.comment
+        && state.string == 0
+        && state.embed == 0
     {
         if let Some((start, end)) = key_value_span(render, first_non_space) {
             fill(&mut hl, start, end, Highlight::Type);
             i = end;
+        }
+    }
+
+    if allow_embeds {
+        if state.undecided && state.embed == 0 && state.string != 0 {
+            resolve_undecided_string(render, syntax, &mut state);
+        }
+        if state.embed != 0 {
+            i = run_region(render, 0, &mut state, &mut hl, syntax);
         }
     }
 
@@ -391,8 +657,8 @@ pub fn highlight_row(
         let prev = if i > 0 { Some(render[i - 1]) } else { None };
         let prev_is_ident = prev.is_some_and(|p| is_ident_char(p, extra));
 
-        if ml_string != 0 {
-            let (_, end) = syntax.multiline_strings[ml_string as usize - 1];
+        if state.string != 0 {
+            let (_, end) = syntax.multiline_strings[state.string as usize - 1];
             if c == '\\' && i + 1 < n {
                 let len = escape_len(render, i);
                 fill(&mut hl, i, i + len, Highlight::Escape);
@@ -403,7 +669,7 @@ pub fn highlight_row(
                 let len = end.chars().count();
                 fill(&mut hl, i, i + len, Highlight::String);
                 i += len;
-                ml_string = 0;
+                state.string = 0;
                 continue;
             }
             hl[i] = Highlight::String;
@@ -411,13 +677,13 @@ pub fn highlight_row(
             continue;
         }
 
-        if in_comment {
+        if state.comment {
             let mce = syntax.multiline_comment_end;
             if matches_at(render, i, mce) {
                 let len = mce.chars().count();
                 fill(&mut hl, i, i + len, Highlight::MlComment);
                 i += len;
-                in_comment = false;
+                state.comment = false;
             } else {
                 hl[i] = Highlight::MlComment;
                 i += 1;
@@ -451,7 +717,7 @@ pub fn highlight_row(
             let len = mcs.chars().count();
             fill(&mut hl, i, i + len, Highlight::MlComment);
             i += len;
-            in_comment = true;
+            state.comment = true;
             continue;
         }
 
@@ -471,7 +737,10 @@ pub fn highlight_row(
                 let len = start.chars().count();
                 fill(&mut hl, i, i + len, Highlight::String);
                 i += len;
-                ml_string = (k + 1) as u8;
+                state.string = (k + 1) as u8;
+                if allow_embeds {
+                    i = start_string_embed(render, i, &mut state, &mut hl, syntax, start);
+                }
                 started_string = true;
                 break;
             }
@@ -489,17 +758,35 @@ pub fn highlight_row(
                     fill(&mut hl, i, i + len, Highlight::Keyword1);
                     i += len;
                     in_tag = false;
+                    let tag = open_tag.take();
+                    if allow_embeds && c == '>' {
+                        if let Some(tag) = tag {
+                            i = start_tag_embed(render, i, &mut state, &mut hl, syntax, &tag);
+                        }
+                    }
                     continue;
                 }
             } else if c == '<' && markup_tag_start(render, i) {
                 let mut j = i + 1;
+                let closing_tag = render.get(j) == Some(&'/');
                 if matches!(render.get(j), Some('/' | '!' | '?')) {
                     j += 1;
                 }
+                let name_start = j;
                 while j < n && is_ident_char(render[j], "-:.") {
                     j += 1;
                 }
                 fill(&mut hl, i, j, Highlight::Keyword1);
+                open_tag = if closing_tag {
+                    None
+                } else {
+                    Some(
+                        render[name_start..j]
+                            .iter()
+                            .collect::<String>()
+                            .to_ascii_lowercase(),
+                    )
+                };
                 i = j;
                 in_tag = true;
                 continue;
@@ -573,6 +860,12 @@ pub fn highlight_row(
             && prev
                 .is_some_and(|p| is_ident_char(p, "") || matches!(p, ')' | ']' | '}' | '.' | '\''));
         if strings && syntax.quotes.contains(c) && (!markup || in_tag) && !tick_blocked {
+            if allow_embeds && !syntax.string_embeds.is_empty() {
+                if let Some(end) = single_line_string_embed(render, i, c, &mut hl, syntax) {
+                    i = end;
+                    continue;
+                }
+            }
             in_string = Some((c, i));
             hl[i] = Highlight::String;
             i += 1;
@@ -622,9 +915,5 @@ pub fn highlight_row(
         i += 1;
     }
 
-    RowHighlight {
-        hl,
-        open_comment: in_comment,
-        open_string: ml_string,
-    }
+    RowHighlight { hl, state }
 }

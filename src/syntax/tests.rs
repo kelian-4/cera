@@ -370,3 +370,109 @@ fn test_default_theme_gives_every_class_its_own_color() {
         highlight_to_rgb(Highlight::MlComment, &theme)
     );
 }
+
+#[test]
+fn test_html_script_and_style_are_colored_with_their_own_language() {
+    let rows = highlight(
+        "a.html",
+        &["<script>", "var x = 1; // c", "</script>", "<p>var 1</p>"],
+    );
+    let script_row = "var x = 1; // c";
+    assert!(kind_of(&rows[1], script_row, "var")
+        .iter()
+        .all(|k| *k == Highlight::Keyword2));
+    assert!(kind_of(&rows[1], script_row, "1")
+        .iter()
+        .all(|k| *k == Highlight::Number));
+    assert!(kind_of(&rows[1], script_row, "// c")
+        .iter()
+        .all(|k| *k == Highlight::Comment));
+    assert!(rows[3].iter().all(|k| *k != Highlight::Keyword2));
+    assert!(kind_of(&rows[3], "<p>var 1</p>", "1")
+        .iter()
+        .all(|k| *k == Highlight::Normal));
+}
+
+#[test]
+fn test_embedded_language_state_survives_update_syntax_cascade() {
+    let db = build_database();
+    let html = select_for_filename(&db, "a.html").unwrap();
+
+    let mut script = Buffer::new();
+    for (idx, text) in ["<script>", "var x = 1;", "</script>", "var y"]
+        .iter()
+        .enumerate()
+    {
+        script.insert_row(idx, text);
+    }
+    update_syntax(&mut script, 0, Some(html));
+    assert_eq!(script.row(1).hl()[0], Highlight::Keyword2);
+    assert_eq!(script.row(1).hl_state.embed, script.row(0).hl_state.embed);
+    assert_ne!(script.row(1).hl_state.embed, 0);
+    assert_eq!(script.row(2).hl_state.embed, 0);
+
+    let mut paragraph = Buffer::new();
+    for (idx, text) in ["<p>", "var x = 1;", "</p>", "var y"].iter().enumerate() {
+        paragraph.insert_row(idx, text);
+    }
+    update_syntax(&mut paragraph, 0, Some(html));
+    update_syntax(&mut paragraph, 3, Some(html));
+    assert_eq!(paragraph.row(1).hl()[0], Highlight::Normal);
+    assert_eq!(paragraph.row(1).hl_state.embed, 0);
+    assert_eq!(paragraph.row(3).hl()[0], Highlight::Normal);
+}
+
+#[test]
+fn test_string_that_is_not_html_or_sql_stays_a_plain_string() {
+    assert_token(
+        "a.py",
+        "x = \"a < b and c\"",
+        "\"a < b and c\"",
+        Highlight::String,
+    );
+    assert_token(
+        "a.py",
+        "x = \"Select an item from the list\"",
+        "Select",
+        Highlight::String,
+    );
+}
+
+#[test]
+fn test_embedded_regions_do_not_nest_beyond_one_level() {
+    let rows = highlight(
+        "a.py",
+        &["x = \"\"\"<script>", "var y = 1;", "</script>\"\"\""],
+    );
+    assert!(kind_of(&rows[1], "var y = 1;", "var")
+        .iter()
+        .all(|k| *k == Highlight::Normal));
+}
+
+#[test]
+fn test_markdown_fence_with_unknown_language_stays_a_string() {
+    let rows = highlight("a.md", &["```nosuchlang", "def x", "```"]);
+    assert!(rows[1].iter().all(|k| *k == Highlight::String));
+}
+
+#[test]
+fn test_every_alias_resolves_to_a_real_language() {
+    let db = build_database();
+    for syntax in &db {
+        for alias in syntax.aliases {
+            assert!(
+                !db.iter().any(|other| other.filetype == *alias),
+                "alias {alias} of {} shadows a language name",
+                syntax.filetype
+            );
+        }
+    }
+    for syntax in &db {
+        for (_, language) in syntax.embed_tags {
+            assert!(db.iter().any(|other| other.filetype == *language));
+        }
+        for language in syntax.string_embeds {
+            assert!(db.iter().any(|other| other.filetype == *language));
+        }
+    }
+}

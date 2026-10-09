@@ -89,6 +89,9 @@ pub fn javascript_syntax() -> Syntax {
         ident_chars: "",
         operators: "+-*/%=<>!&|^~?:",
         line_rules: &[],
+        aliases: &["js", "node", "jsx"],
+        embed_tags: &[],
+        string_embeds: &["html", "sql"],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::FUNCTIONS)

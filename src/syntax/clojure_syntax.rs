@@ -65,6 +65,9 @@ pub fn clojure_syntax() -> Syntax {
         ident_chars: "-?!*<>=+.",
         operators: "",
         line_rules: &[],
+        aliases: &["clj"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::PAREN_CALLS),

@@ -19,6 +19,9 @@ pub fn html_syntax() -> Syntax {
         ident_chars: "",
         operators: "",
         line_rules: &[],
+        aliases: &["htm", "xhtml"],
+        embed_tags: &[("script", "javascript"), ("style", "css")],
+        string_embeds: &[],
         flags: HighlightFlags::STRINGS.union(HighlightFlags::MARKUP),
     }
 }

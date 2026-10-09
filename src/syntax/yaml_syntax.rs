@@ -25,6 +25,9 @@ pub fn yaml_syntax() -> Syntax {
             ("---", Highlight::Preprocessor),
             ("...", Highlight::Preprocessor),
         ],
+        aliases: &["yml"],
+        embed_tags: &[],
+        string_embeds: &[],
         flags: HighlightFlags::NUMBERS
             .union(HighlightFlags::STRINGS)
             .union(HighlightFlags::KEY_VALUES)

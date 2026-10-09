@@ -43,7 +43,9 @@ def read_message():
 def load_languages():
     with open(LANGUAGES_PATH, "r", encoding="utf-8") as f:
         raw = json.load(f)
-    return [prepare_language(entry) for entry in raw]
+    languages = [prepare_language(entry) for entry in raw]
+    REGISTRY[:] = languages
+    return languages
 
 
 def prepare_language(entry):
@@ -310,8 +312,233 @@ def key_value_span(text, first):
     return None
 
 
-def highlight_row(text, language, in_comment, open_string):
+REGISTRY = []
+SQL_STARTERS = ("select", "insert", "update", "delete", "create", "drop", "alter")
+SQL_MARKERS = (" from ", " into ", " set ", " values", " table ", " where ", " join ")
+ASCII_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+class State:
+    __slots__ = ("comment", "string", "embed", "embed_end", "inner_comment", "inner_string", "undecided")
+
+    def __init__(self, comment=False, string=0, embed=0, embed_end=0, inner_comment=False, inner_string=0, undecided=False):
+        self.comment = comment
+        self.string = string
+        self.embed = embed
+        self.embed_end = embed_end
+        self.inner_comment = inner_comment
+        self.inner_string = inner_string
+        self.undecided = undecided
+
+    def copy(self):
+        return State(self.comment, self.string, self.embed, self.embed_end, self.inner_comment, self.inner_string, self.undecided)
+
+
+def ascii_lower(text):
+    return "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in text)
+
+
+def ascii_upper(text):
+    return "".join(chr(ord(c) - 32) if "a" <= c <= "z" else c for c in text)
+
+
+def language_by_name(name):
+    wanted = ascii_lower(name)
+    if not wanted:
+        return None
+    for index, language in enumerate(REGISTRY):
+        if language["filetype"] == wanted:
+            return index + 1, language
+    for index, language in enumerate(REGISTRY):
+        if wanted in language["aliases"]:
+            return index + 1, language
+    return None
+
+
+def language_at(index_plus_one):
+    if index_plus_one < 1 or index_plus_one > len(REGISTRY):
+        return None
+    return REGISTRY[index_plus_one - 1]
+
+
+def sniff_language(content, allowed):
+    start = next((k for k, c in enumerate(content) if not c.isspace()), None)
+    if start is None:
+        return None
+    rest = content[start:]
+    if "html" in allowed and rest[0] == "<" and len(rest) > 1 and (rest[1].isalpha() or rest[1] in "!/?"):
+        return "html"
+    if "sql" in allowed:
+        word_end = 0
+        while word_end < len(rest) and rest[word_end] in ASCII_LETTERS:
+            word_end += 1
+        word = rest[:word_end]
+        lower = ascii_lower(rest)
+        uniform_case = word == ascii_upper(word) or word == ascii_lower(word)
+        after = rest[word_end] if word_end < len(rest) else None
+        starts_like_sql = ascii_lower(word) in SQL_STARTERS
+        has_marker = any(marker in lower for marker in SQL_MARKERS)
+        if starts_like_sql and uniform_case and after is not None and after.isspace() and has_marker:
+            return "sql"
+    return None
+
+
+def matches_closing_tag(text, at, tag):
+    if text[at:at + 2] != "</":
+        return False
+    idx = at + 2
+    for expected in tag:
+        if idx < len(text) and ascii_lower(text[idx]) == ascii_lower(expected):
+            idx += 1
+        else:
+            return False
+    return not (idx < len(text) and is_ident_char(text[idx], "-"))
+
+
+def region_terminator(text, start, state, host):
     n = len(text)
+    if state.embed_end == 0:
+        if state.string < 1 or state.string > len(host["multiline_strings"]):
+            return None
+        end = host["multiline_strings"][state.string - 1][1]
+        if not end:
+            return None
+        found = text.find(end, start)
+        return found if found != -1 else None
+    if state.embed_end > len(host["embed_tags"]):
+        return None
+    tag = host["embed_tags"][state.embed_end - 1][0]
+    for p in range(start, n):
+        if matches_closing_tag(text, p, tag):
+            return p
+    return None
+
+
+def run_region(text, start, state, kinds, host):
+    inner = language_at(state.embed)
+    if inner is None:
+        state.embed = 0
+        state.embed_end = 0
+        return start
+    terminator = region_terminator(text, start, state, host)
+    stop = terminator if terminator is not None else len(text)
+    inner_state = State(comment=state.inner_comment, string=state.inner_string)
+    inner_kinds, inner_result = highlight_row(text[start:stop], inner, inner_state, False)
+    for offset, kind in enumerate(inner_kinds):
+        kinds[start + offset] = kind
+    if terminator is not None:
+        state.embed = 0
+        state.embed_end = 0
+        state.inner_comment = False
+        state.inner_string = 0
+    else:
+        state.inner_comment = inner_result.comment
+        state.inner_string = inner_result.string
+    return stop
+
+
+def resolve_undecided_string(text, host, state):
+    first = next((k for k, c in enumerate(text) if not c.isspace()), None)
+    if first is None:
+        return
+    state.undecided = False
+    if state.string < 1 or state.string > len(host["multiline_strings"]):
+        return
+    end = host["multiline_strings"][state.string - 1][1]
+    found = text.find(end) if end else -1
+    terminator = found if found != -1 else None
+    if terminator is not None and terminator <= first:
+        return
+    content_end = terminator if terminator is not None else len(text)
+    name = sniff_language(text[:content_end], host["string_embeds"])
+    if name:
+        found_language = language_by_name(name)
+        if found_language:
+            state.embed = found_language[0]
+            state.embed_end = 0
+
+
+def start_string_embed(text, start, state, kinds, host, delimiter):
+    n = len(text)
+    if state.string < 1 or state.string > len(host["multiline_strings"]):
+        return start
+    end = host["multiline_strings"][state.string - 1][1]
+    found = text.find(end, start) if end else -1
+    terminator = found if found != -1 else None
+    if "fences" in host["flagset"] and delimiter in ("```", "~~~"):
+        if terminator is not None:
+            return start
+        info = text[start:].strip().lstrip("{.")
+        word = ""
+        for c in info:
+            if c.isalnum() or c in "+#-_":
+                word += c
+            else:
+                break
+        for k in range(start, n):
+            kinds[k] = "string"
+        found_language = language_by_name(word)
+        if found_language:
+            state.embed = found_language[0]
+            state.embed_end = 0
+        return n
+    if not host["string_embeds"]:
+        return start
+    content_end = terminator if terminator is not None else n
+    if all(c.isspace() for c in text[start:content_end]):
+        if terminator is None:
+            state.undecided = True
+        return start
+    name = sniff_language(text[start:content_end], host["string_embeds"])
+    if name:
+        found_language = language_by_name(name)
+        if found_language:
+            state.embed = found_language[0]
+            state.embed_end = 0
+            return run_region(text, start, state, kinds, host)
+    return start
+
+
+def start_tag_embed(text, start, state, kinds, host, tag):
+    rule = next((k for k, (name, _) in enumerate(host["embed_tags"]) if name == tag), None)
+    if rule is None:
+        return start
+    found_language = language_by_name(host["embed_tags"][rule][1])
+    if not found_language:
+        return start
+    state.embed = found_language[0]
+    state.embed_end = rule + 1
+    return run_region(text, start, state, kinds, host)
+
+
+def single_line_string_embed(text, opening, quote, kinds, host):
+    n = len(text)
+    close = opening + 1
+    while close < n and text[close] != quote:
+        if text[close] == "\\":
+            close += 1
+        close += 1
+    close = min(close, n)
+    name = sniff_language(text[opening + 1:close], host["string_embeds"])
+    if not name:
+        return None
+    found_language = language_by_name(name)
+    if not found_language:
+        return None
+    kinds[opening] = "string"
+    inner_kinds, _ = highlight_row(text[opening + 1:close], found_language[1], State(), False)
+    for offset, kind in enumerate(inner_kinds):
+        kinds[opening + 1 + offset] = kind
+    if close < n:
+        kinds[close] = "string"
+        return close + 1
+    return n
+
+
+def highlight_row(text, language, incoming, allow_embeds=True):
+    n = len(text)
+    state = incoming.copy()
+    open_tag = None
     kinds = ["normal"] * n
     flags = language["flagset"]
     extra = language["ident_chars"]
@@ -333,29 +560,41 @@ def highlight_row(text, language, in_comment, open_string):
     def starts(pattern, at):
         return bool(pattern) and text.startswith(pattern, at)
 
-    if not in_comment and open_string == 0:
+    if not state.comment and state.string == 0 and state.embed == 0:
         for prefix, kind in language["line_rules"]:
             if starts(prefix, 0):
-                return [kind.lower()] * n, False, 0
+                return [kind.lower()] * n, State()
 
     first = next((k for k, c in enumerate(text) if not c.isspace()), None)
     in_string = None
     in_tag = False
     i = 0
     starts_with_directive = bool(directive) and first is not None and starts(directive, first)
-    if "key_values" in flags and not starts_with_directive and not in_comment and open_string == 0:
+    if (
+        "key_values" in flags
+        and not starts_with_directive
+        and not state.comment
+        and state.string == 0
+        and state.embed == 0
+    ):
         span = key_value_span(text, first)
         if span:
             fill(span[0], span[1], "type")
             i = span[1]
+
+    if allow_embeds:
+        if state.undecided and state.embed == 0 and state.string != 0:
+            resolve_undecided_string(text, language, state)
+        if state.embed != 0:
+            i = run_region(text, 0, state, kinds, language)
 
     while i < n:
         c = text[i]
         preceding = text[i - 1] if i > 0 else None
         preceding_is_ident = preceding is not None and is_ident_char(preceding, extra)
 
-        if open_string != 0:
-            end = ml_strings[open_string - 1][1]
+        if state.string != 0:
+            end = ml_strings[state.string - 1][1]
             if c == "\\" and i + 1 < n:
                 length = escape_length(text, i)
                 fill(i, i + length, "escape")
@@ -364,17 +603,17 @@ def highlight_row(text, language, in_comment, open_string):
             if starts(end, i):
                 fill(i, i + len(end), "string")
                 i += len(end)
-                open_string = 0
+                state.string = 0
                 continue
             kinds[i] = "string"
             i += 1
             continue
 
-        if in_comment:
+        if state.comment:
             if starts(comment_end, i):
                 fill(i, i + len(comment_end), "comment")
                 i += len(comment_end)
-                in_comment = False
+                state.comment = False
             else:
                 kinds[i] = "comment"
                 i += 1
@@ -398,7 +637,7 @@ def highlight_row(text, language, in_comment, open_string):
         if comment_start and comment_end and starts(comment_start, i):
             fill(i, i + len(comment_start), "comment")
             i += len(comment_start)
-            in_comment = True
+            state.comment = True
             continue
 
         shell_hash = single == "#" and preceding in ("$", "{")
@@ -412,7 +651,9 @@ def highlight_row(text, language, in_comment, open_string):
             if starts(begin, i) and not (begins_with_ident and preceding_is_ident):
                 fill(i, i + len(begin), "string")
                 i += len(begin)
-                open_string = index + 1
+                state.string = index + 1
+                if allow_embeds:
+                    i = start_string_embed(text, i, state, kinds, language, begin)
                 started = True
                 break
         if started:
@@ -426,14 +667,21 @@ def highlight_row(text, language, in_comment, open_string):
                     fill(i, i + length, "keyword1")
                     i += length
                     in_tag = False
+                    tag = open_tag
+                    open_tag = None
+                    if allow_embeds and c == ">" and tag is not None:
+                        i = start_tag_embed(text, i, state, kinds, language, tag)
                     continue
             elif c == "<" and markup_tag_start(text, i):
                 j = i + 1
+                closing_tag = j < n and text[j] == "/"
                 if j < n and text[j] in "/!?":
                     j += 1
+                name_start = j
                 while j < n and is_ident_char(text[j], "-:."):
                     j += 1
                 fill(i, j, "keyword1")
+                open_tag = None if closing_tag else ascii_lower(text[name_start:j])
                 i = j
                 in_tag = True
                 continue
@@ -495,6 +743,11 @@ def highlight_row(text, language, in_comment, open_string):
             and (is_ident_char(preceding, "") or preceding in ")]}.'")
         )
         if strings and c in quotes and (not markup or in_tag) and not tick_blocked:
+            if allow_embeds and language["string_embeds"]:
+                embedded_end = single_line_string_embed(text, i, c, kinds, language)
+                if embedded_end is not None:
+                    i = embedded_end
+                    continue
             in_string = (c, i)
             kinds[i] = "string"
             i += 1
@@ -532,15 +785,14 @@ def highlight_row(text, language, in_comment, open_string):
             kinds[i] = "operator"
         i += 1
 
-    return kinds, in_comment, open_string
+    return kinds, state
 
 
 def classify_lines(lines, language):
     result = []
-    in_comment = False
-    open_string = 0
+    state = State()
     for line in lines:
-        kinds, in_comment, open_string = highlight_row(line, language, in_comment, open_string)
+        kinds, state = highlight_row(line, language, state)
         result.append(kinds)
     return result
 
