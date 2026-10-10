@@ -28,6 +28,10 @@ pub const CTRL_ARROW_LEFT: i32 = 1010;
 pub const CTRL_ARROW_RIGHT: i32 = 1011;
 pub const CTRL_ARROW_UP: i32 = 1012;
 pub const CTRL_ARROW_DOWN: i32 = 1013;
+pub const PASTE_EVENT: i32 = 1020;
+const MAX_PASTE_BYTES: usize = 256 * 1024 * 1024;
+const PASTE_IDLE_ATTEMPTS: u32 = 20;
+const PASTE_END: &[u8] = b"\x1b[201~";
 
 const CODEPOINT_BASE: i32 = 0x110000;
 
@@ -64,6 +68,7 @@ pub struct Terminal {
     orig_termios: termios::Termios,
     raw_mode_enabled: bool,
     last_mouse: MouseEvent,
+    last_paste: String,
 }
 
 impl Terminal {
@@ -75,10 +80,11 @@ impl Terminal {
             orig_termios: orig_termios.clone(),
             raw_mode_enabled: false,
             last_mouse: MouseEvent::default(),
+            last_paste: String::new(),
         };
 
         term.enable_raw_mode()?;
-        term.write(b"\x1b[?1049h");
+        term.write(b"\x1b[?1049h\x1b[?2004h");
 
         Ok(term)
     }
@@ -129,12 +135,38 @@ impl Terminal {
 
     pub fn shutdown(&mut self) {
         self.disable_mouse_reporting();
-        self.write(b"\x1b[?1049l");
+        self.write(b"\x1b[?2004l\x1b[?1049l");
         self.disable_raw_mode();
     }
 
     pub fn last_mouse_event(&self) -> MouseEvent {
         self.last_mouse
+    }
+
+    pub fn take_paste(&mut self) -> String {
+        std::mem::take(&mut self.last_paste)
+    }
+
+    fn read_bracketed_paste(&mut self) -> io::Result<i32> {
+        let mut data: Vec<u8> = Vec::new();
+        let mut idle = 0;
+        while idle < PASTE_IDLE_ATTEMPTS && data.len() < MAX_PASTE_BYTES {
+            match self.read_byte_raw() {
+                Ok(Some(byte)) => {
+                    idle = 0;
+                    data.push(byte);
+                    if data.ends_with(PASTE_END) {
+                        data.truncate(data.len() - PASTE_END.len());
+                        break;
+                    }
+                }
+                Ok(None) => idle += 1,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                Err(error) => return Err(error),
+            }
+        }
+        self.last_paste = String::from_utf8_lossy(&data).into_owned();
+        Ok(PASTE_EVENT)
     }
 
     pub fn install_resize_handler() {
@@ -255,6 +287,12 @@ impl Terminal {
                     }
                     if next == b'~' {
                         let code: i32 = num.parse().unwrap_or(0);
+                        if code == 200 {
+                            return self.read_bracketed_paste();
+                        }
+                        if code == 201 {
+                            return Ok(NO_KEY);
+                        }
                         return Ok(match code {
                             1 | 7 => HOME_KEY,
                             3 => DEL_KEY,
@@ -438,7 +476,7 @@ fn get_window_size_ioctl() -> Option<(u16, u16)> {
 }
 
 pub fn die(context: &str) -> ! {
-    let _ = io::stdout().write_all(b"\x1b[?1049l");
+    let _ = io::stdout().write_all(b"\x1b[?2004l\x1b[?1049l");
     let _ = io::stdout().flush();
     eprintln!("{}: {}", context, io::Error::last_os_error());
     std::process::exit(1);

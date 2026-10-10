@@ -783,6 +783,11 @@ impl Editor {
                     self.prompt_cursor_offset = None;
                     return Some(buf.iter().collect());
                 }
+            } else if c == terminal::PASTE_EVENT {
+                for pasted in single_line_pasted_text(&self.terminal.take_paste()) {
+                    buf.insert(cursor, pasted);
+                    cursor += 1;
+                }
             } else if terminal::is_encoded_codepoint(c) {
                 buf.insert(cursor, terminal::decode_codepoint(c));
                 cursor += 1;
@@ -999,6 +1004,11 @@ impl Editor {
                 if self.search_cursor > 0 {
                     self.search_cursor -= 1;
                     chars.remove(self.search_cursor);
+                }
+            } else if c == terminal::PASTE_EVENT {
+                for pasted in single_line_pasted_text(&self.terminal.take_paste()) {
+                    chars.insert(self.search_cursor, pasted);
+                    self.search_cursor += 1;
                 }
             } else if terminal::is_encoded_codepoint(c) {
                 chars.insert(self.search_cursor, terminal::decode_codepoint(c));
@@ -1723,6 +1733,11 @@ impl Editor {
 
     fn paste_clipboard(&mut self) {
         let text = self.clipboard.paste();
+        self.paste_text(&text);
+    }
+
+    fn paste_text(&mut self, raw: &str) {
+        let text = normalize_pasted_text(raw);
         if text.is_empty() {
             let msg = self.i18n.t("status.clipboard_empty");
             self.set_status_message(msg);
@@ -1949,6 +1964,14 @@ impl Editor {
             return;
         }
 
+        if c == terminal::PASTE_EVENT {
+            let text = self.terminal.take_paste();
+            if !self.overlay_full_doc && !self.side_panel_has_focus() {
+                self.paste_text(&text);
+            }
+            return;
+        }
+
         if self.overlay_full_doc {
             self.handle_full_doc_key(c);
             return;
@@ -2067,5 +2090,58 @@ impl Editor {
         }
 
         self.quit_times = self.config.quit_times;
+    }
+}
+
+fn normalize_pasted_text(raw: &str) -> String {
+    raw.replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .chars()
+        .filter(|c| *c == '\n' || *c == '\t' || !c.is_control())
+        .collect()
+}
+
+fn single_line_pasted_text(raw: &str) -> Vec<char> {
+    raw.chars()
+        .take_while(|c| *c != '\n' && *c != '\r')
+        .filter(|c| !c.is_control())
+        .collect()
+}
+
+#[cfg(test)]
+mod paste_text_tests {
+    use super::{normalize_pasted_text, single_line_pasted_text};
+
+    #[test]
+    fn test_normalize_unifies_every_kind_of_line_ending() {
+        assert_eq!(normalize_pasted_text("a\r\nb\rc\nd"), "a\nb\nc\nd");
+    }
+
+    #[test]
+    fn test_normalize_keeps_tabs_and_unicode() {
+        assert_eq!(
+            normalize_pasted_text("\tx\u{e9}\u{20ac}\n"),
+            "\tx\u{e9}\u{20ac}\n"
+        );
+    }
+
+    #[test]
+    fn test_normalize_drops_control_characters_that_could_trigger_commands() {
+        assert_eq!(
+            normalize_pasted_text("a\u{11}b\u{13}c\u{1b}[31md\u{7}"),
+            "abc[31md"
+        );
+    }
+
+    #[test]
+    fn test_single_line_paste_stops_at_the_first_line_break() {
+        assert_eq!(single_line_pasted_text("one\ntwo"), vec!['o', 'n', 'e']);
+        assert_eq!(single_line_pasted_text("one\rtwo"), vec!['o', 'n', 'e']);
+        assert!(single_line_pasted_text("\nonly second").is_empty());
+    }
+
+    #[test]
+    fn test_single_line_paste_drops_control_characters() {
+        assert_eq!(single_line_pasted_text("a\u{1}b\tc"), vec!['a', 'b', 'c']);
     }
 }

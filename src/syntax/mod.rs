@@ -136,6 +136,13 @@ pub fn matches(syntax: &Syntax, filename: &str) -> bool {
 }
 
 pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax>) {
+    let mut idx = row_idx;
+    while highlight_buffer_row(buffer, idx, syntax) && idx + 1 < buffer.num_rows() {
+        idx += 1;
+    }
+}
+
+fn highlight_buffer_row(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax>) -> bool {
     let rsize = buffer.row(row_idx).rsize();
     buffer.row_mut(row_idx).hl_mut().clear();
     buffer
@@ -143,9 +150,8 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
         .hl_mut()
         .resize(rsize, Highlight::Normal);
 
-    let syntax = match syntax {
-        Some(s) => s,
-        None => return,
+    let Some(syntax) = syntax else {
+        return false;
     };
 
     let render: Vec<char> = buffer.row(row_idx).render().chars().collect();
@@ -164,9 +170,7 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
 
     let changed = buffer.row(row_idx).hl_state != result.state;
     buffer.row_mut(row_idx).hl_state = result.state;
-    if changed && row_idx + 1 < buffer.num_rows() {
-        update_syntax(buffer, row_idx + 1, Some(syntax));
-    }
+    changed
 }
 
 pub fn select_for_filename<'a>(database: &'a [Syntax], filename: &str) -> Option<&'a Syntax> {

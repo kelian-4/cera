@@ -476,3 +476,26 @@ fn test_every_alias_resolves_to_a_real_language() {
         }
     }
 }
+
+#[test]
+fn test_update_syntax_cascade_is_iterative_and_does_not_overflow_the_stack() {
+    let handle = std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let db = build_database();
+            let c = select_for_filename(&db, "a.c").unwrap();
+            let mut buf = Buffer::new();
+            buf.insert_row(0, "int x;");
+            for idx in 1..30_000 {
+                buf.insert_row(idx, "still text");
+            }
+            for row in 0..buf.num_rows() {
+                update_syntax(&mut buf, row, Some(c));
+            }
+            buf.row_mut(0).set_chars("/* open");
+            update_syntax(&mut buf, 0, Some(c));
+            assert_eq!(buf.row(29_999).hl()[0], Highlight::MlComment);
+        })
+        .unwrap();
+    handle.join().unwrap();
+}
