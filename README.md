@@ -2,14 +2,29 @@
 
 # Cera
 
-[![CI](https://github.com/kelian-4/cera/actions/workflows/ci.yml/badge.svg)](https://github.com/kelian-4/cera/actions/workflows/ci.yml)
-
 Cera est un éditeur de texte pour le terminal, écrit en Rust.
+
+<img width="1356" height="713" alt="2026-10-12_08:11:54" src="https://github.com/user-attachments/assets/f9f8b026-e080-4947-8b75-53dda044eb3f" />
+
+<img width="1356" height="700" alt="2026-10-12_08:13:12" src="https://github.com/user-attachments/assets/ebb3ec6a-f533-467f-adba-46a9f7e5bc4a" />
+
 
 ## Qu'est-ce que Cera ?
 
-Cera est un éditeur simple à prendre en main : des raccourcis `Ctrl` classiques (`Ctrl-S` sauvegarde, `Ctrl-Q` quitte), la souris, des onglets, et une coloration syntaxique. Il est une alternative plus moderne et intuitive aux terminaux classiques
-avec un système de plugins pouvant être écrits en C++, C, Rust, JS, Python.
+Cera est un éditeur cli simple à prendre en main. Il est pense comme une alternative plus moderne et plus intuitive aux éditeur classiques avec un système de plugins pouvant être écrits en C++, C, Rust, JS, Python permettant d'etendre ou modifier l'editeur a son bon vouloir sans modifier le code source.
+
+## Images 
+
+File explore
+
+<img width="1341" height="706" alt="2026-10-12_08:13:40" src="https://github.com/user-attachments/assets/efbd73e4-edda-4c00-bc57-7cb2b39db7ac" />
+
+
+Pretty-cat 
+
+<img width="1321" height="673" alt="2026-10-12_09:53:26" src="https://github.com/user-attachments/assets/26534a12-8e1c-4112-af36-203db33e5006" />
+
+et plus
 
 La liste complète des fonctionnalités et des raccourcis est dans l'éditeur : `Ctrl-D`, ou `cera --help` pour les options.
 
