@@ -33,6 +33,7 @@
             description = "Editeur de texte terminal avec systeme de plugins";
             homepage = "https://github.com/kelian-4/cera";
             mainProgram = "cera";
+            license = pkgs.lib.licenses.gpl3Plus;
             platforms = pkgs.lib.platforms.linux;
           };
         };

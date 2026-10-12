@@ -2,6 +2,7 @@
 name = "cera"
 version = "0.1.0"
 edition = "2021"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 nix = { version = "0.27", features = ["term", "poll", "signal", "ioctl", "fs"] }
