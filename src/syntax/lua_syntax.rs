@@ -6,12 +6,27 @@ pub fn lua_syntax() -> Syntax {
         filematch: &[".lua"],
         keywords: &[
             "function", "end", "if", "then", "else", "elseif", "for", "while", "repeat", "until",
-            "do", "break", "return", "local", "in", "and", "or", "not", "require", "true|",
-            "false|", "nil|",
+            "do", "break", "return", "local", "in", "and", "or", "not", "require",
         ],
+        types: &[],
+        constants: &["true", "false", "nil"],
         singleline_comment_start: "--",
+        alt_comment_start: "",
         multiline_comment_start: "--[[",
         multiline_comment_end: "]]",
-        flags: HighlightFlags::NUMBERS.union(HighlightFlags::STRINGS),
+        multiline_strings: &[("[[", "]]"), ("[=[", "]=]")],
+        quotes: "\"'",
+        directive_prefix: "",
+        annotation_prefixes: &[],
+        variable_prefixes: "",
+        ident_chars: "",
+        operators: "+-*/%^=<>~",
+        line_rules: &[],
+        aliases: &[],
+        embed_tags: &[],
+        string_embeds: &["html", "sql"],
+        flags: HighlightFlags::NUMBERS
+            .union(HighlightFlags::STRINGS)
+            .union(HighlightFlags::FUNCTIONS),
     }
 }

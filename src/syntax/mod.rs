@@ -1,35 +1,95 @@
+pub mod ada_syntax;
+pub mod assembly_syntax;
+pub mod awk_syntax;
 pub mod c_syntax;
+pub mod clojure_syntax;
+pub mod cmake_syntax;
+pub mod cobol_syntax;
+pub mod coffeescript_syntax;
 pub mod cpp_syntax;
+pub mod crystal_syntax;
 pub mod csharp_syntax;
 pub mod css_syntax;
+pub mod d_syntax;
+pub mod dart_syntax;
+pub mod diff_syntax;
+pub mod dockerfile_syntax;
+pub mod elixir_syntax;
+pub mod elm_syntax;
+pub mod engine;
+pub mod erlang_syntax;
+pub mod fish_syntax;
+pub mod fortran_syntax;
+pub mod fsharp_syntax;
 pub mod go_syntax;
+pub mod graphql_syntax;
+pub mod groovy_syntax;
 pub mod haskell_syntax;
+pub mod hcl_syntax;
 pub mod html_syntax;
+pub mod ini_syntax;
 pub mod java_syntax;
 pub mod javascript_syntax;
 pub mod json_syntax;
+pub mod julia_syntax;
 pub mod kotlin_syntax;
+pub mod latex_syntax;
+pub mod lisp_syntax;
 pub mod lua_syntax;
+pub mod makefile_syntax;
 pub mod markdown_syntax;
+pub mod matlab_syntax;
+pub mod nim_syntax;
+pub mod nix_syntax;
+pub mod ocaml_syntax;
+pub mod pascal_syntax;
 pub mod perl_syntax;
 pub mod php_syntax;
+pub mod powershell_syntax;
+pub mod prolog_syntax;
+pub mod protobuf_syntax;
 pub mod python_syntax;
 pub mod r_syntax;
 pub mod ruby_syntax;
 pub mod rust_syntax;
+pub mod scala_syntax;
+pub mod scheme_syntax;
+pub mod scss_syntax;
 pub mod shell_syntax;
+pub mod solidity_syntax;
 pub mod sql_syntax;
 pub mod swift_syntax;
+pub mod tcl_syntax;
+pub mod toml_syntax;
+pub mod typescript_syntax;
+pub mod verilog_syntax;
+pub mod vhdl_syntax;
+pub mod vim_syntax;
+pub mod visualbasic_syntax;
+pub mod xml_syntax;
 pub mod yaml_syntax;
 pub mod zig_syntax;
 
 use crate::model::buffer::Buffer;
-use crate::model::row::Highlight;
+use crate::model::row::{Highlight, HlState};
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy)]
     pub struct HighlightFlags: u32 {
         const NUMBERS = 1 << 0;
         const STRINGS = 1 << 1;
+        const FUNCTIONS = 1 << 2;
+        const CAPITALIZED_TYPES = 1 << 3;
+        const UPPER_CONSTANTS = 1 << 4;
+        const CASE_INSENSITIVE = 1 << 5;
+        const PAREN_CALLS = 1 << 6;
+        const MARKUP = 1 << 7;
+        const KEY_STRINGS = 1 << 8;
+        const KEY_VALUES = 1 << 9;
+        const CHAR_LITERALS = 1 << 10;
+        const TICK_STRINGS = 1 << 11;
+        const CSS_VALUES = 1 << 12;
+        const FENCES = 1 << 13;
     }
 }
 
@@ -37,9 +97,23 @@ pub struct Syntax {
     pub filetype: &'static str,
     pub filematch: &'static [&'static str],
     pub keywords: &'static [&'static str],
+    pub types: &'static [&'static str],
+    pub constants: &'static [&'static str],
     pub singleline_comment_start: &'static str,
+    pub alt_comment_start: &'static str,
     pub multiline_comment_start: &'static str,
     pub multiline_comment_end: &'static str,
+    pub multiline_strings: &'static [(&'static str, &'static str)],
+    pub quotes: &'static str,
+    pub directive_prefix: &'static str,
+    pub annotation_prefixes: &'static [&'static str],
+    pub variable_prefixes: &'static str,
+    pub ident_chars: &'static str,
+    pub operators: &'static str,
+    pub line_rules: &'static [(&'static str, Highlight)],
+    pub aliases: &'static [&'static str],
+    pub embed_tags: &'static [(&'static str, &'static str)],
+    pub string_embeds: &'static [&'static str],
     pub flags: HighlightFlags,
 }
 
@@ -61,15 +135,14 @@ pub fn matches(syntax: &Syntax, filename: &str) -> bool {
     false
 }
 
-fn is_separator(c: char) -> bool {
-    c.is_whitespace() || c == '\0' || ",.()+-/*=~%<>[]{};:!&|".contains(c)
-}
-
-fn is_keyword2(kw: &str) -> bool {
-    kw.ends_with('|')
-}
-
 pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax>) {
+    let mut idx = row_idx;
+    while highlight_buffer_row(buffer, idx, syntax) && idx + 1 < buffer.num_rows() {
+        idx += 1;
+    }
+}
+
+fn highlight_buffer_row(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax>) -> bool {
     let rsize = buffer.row(row_idx).rsize();
     buffer.row_mut(row_idx).hl_mut().clear();
     buffer
@@ -77,159 +150,36 @@ pub fn update_syntax(buffer: &mut Buffer, row_idx: usize, syntax: Option<&Syntax
         .hl_mut()
         .resize(rsize, Highlight::Normal);
 
-    let syntax = match syntax {
-        Some(s) => s,
-        None => return,
+    let Some(syntax) = syntax else {
+        return false;
     };
 
     let render: Vec<char> = buffer.row(row_idx).render().chars().collect();
-    let mut hl_by_char = vec![Highlight::Normal; render.len()];
-
-    let scs = syntax.singleline_comment_start;
-    let mcs = syntax.multiline_comment_start;
-    let mce = syntax.multiline_comment_end;
-
-    let mut prev_sep = true;
-    let mut in_string: Option<char> = None;
-    let mut in_comment = row_idx > 0 && buffer.row(row_idx - 1).hl_open_comment;
-
-    let matches_at = |chars: &[char], i: usize, pat: &str| -> bool {
-        if pat.is_empty() {
-            return false;
-        }
-        let pat_chars: Vec<char> = pat.chars().collect();
-        if i + pat_chars.len() > chars.len() {
-            return false;
-        }
-        chars[i..i + pat_chars.len()] == pat_chars[..]
+    let previous = if row_idx > 0 {
+        buffer.row(row_idx - 1).hl_state
+    } else {
+        HlState::default()
     };
+    let result = engine::highlight_row(&render, syntax, previous);
 
-    let n = render.len();
-    let mut i = 0usize;
-
-    while i < n {
-        let c = render[i];
-        let prev_hl = if i > 0 {
-            hl_by_char[i - 1]
-        } else {
-            Highlight::Normal
-        };
-
-        if !scs.is_empty() && in_string.is_none() && !in_comment && matches_at(&render, i, scs) {
-            for slot in hl_by_char.iter_mut().skip(i) {
-                *slot = Highlight::Comment;
-            }
-            break;
-        }
-
-        if !mcs.is_empty() && !mce.is_empty() && in_string.is_none() {
-            if in_comment {
-                hl_by_char[i] = Highlight::MlComment;
-                if matches_at(&render, i, mce) {
-                    let len = mce.chars().count();
-                    for k in 0..len {
-                        hl_by_char[i + k] = Highlight::MlComment;
-                    }
-                    i += len;
-                    in_comment = false;
-                    prev_sep = true;
-                    continue;
-                }
-                i += 1;
-                continue;
-            } else if matches_at(&render, i, mcs) {
-                let len = mcs.chars().count();
-                for k in 0..len {
-                    hl_by_char[i + k] = Highlight::MlComment;
-                }
-                i += len;
-                in_comment = true;
-                continue;
-            }
-        }
-
-        if syntax.flags.contains(HighlightFlags::STRINGS) {
-            if let Some(quote) = in_string {
-                hl_by_char[i] = Highlight::String;
-                if c == '\\' && i + 1 < n {
-                    hl_by_char[i + 1] = Highlight::String;
-                    i += 2;
-                    continue;
-                }
-                if c == quote {
-                    in_string = None;
-                }
-                i += 1;
-                prev_sep = true;
-                continue;
-            } else if c == '"' || c == '\'' {
-                in_string = Some(c);
-                hl_by_char[i] = Highlight::String;
-                i += 1;
-                continue;
-            }
-        }
-
-        if syntax.flags.contains(HighlightFlags::NUMBERS)
-            && ((c.is_ascii_digit() && (prev_sep || prev_hl == Highlight::Number))
-                || (c == '.' && prev_hl == Highlight::Number))
-        {
-            hl_by_char[i] = Highlight::Number;
-            i += 1;
-            prev_sep = false;
-            continue;
-        }
-
-        if prev_sep {
-            let mut matched = false;
-            for kw in syntax.keywords {
-                let kw2 = is_keyword2(kw);
-                let kw_body = if kw2 { &kw[..kw.len() - 1] } else { kw };
-                let klen = kw_body.chars().count();
-
-                if matches_at(&render, i, kw_body) {
-                    let next_char = render.get(i + klen).copied().unwrap_or('\0');
-                    if is_separator(next_char) {
-                        let h = if kw2 {
-                            Highlight::Keyword2
-                        } else {
-                            Highlight::Keyword1
-                        };
-                        for slot in hl_by_char.iter_mut().skip(i).take(klen) {
-                            *slot = h;
-                        }
-                        i += klen;
-                        matched = true;
-                        break;
-                    }
-                }
-            }
-            if matched {
-                prev_sep = false;
-                continue;
-            }
-        }
-
-        prev_sep = is_separator(c);
-        i += 1;
-    }
-
-    {
-        let row = buffer.row_mut(row_idx);
-        for (idx, h) in hl_by_char.into_iter().enumerate() {
-            row.hl_mut()[idx] = h;
+    for (idx, kind) in result.hl.into_iter().enumerate() {
+        if let Some(slot) = buffer.row_mut(row_idx).hl_mut().get_mut(idx) {
+            *slot = kind;
         }
     }
 
-    let changed = buffer.row(row_idx).hl_open_comment != in_comment;
-    buffer.row_mut(row_idx).hl_open_comment = in_comment;
-    if changed && row_idx + 1 < buffer.num_rows() {
-        update_syntax(buffer, row_idx + 1, Some(syntax));
-    }
+    let changed = buffer.row(row_idx).hl_state != result.state;
+    buffer.row_mut(row_idx).hl_state = result.state;
+    changed
 }
 
 pub fn select_for_filename<'a>(database: &'a [Syntax], filename: &str) -> Option<&'a Syntax> {
     database.iter().find(|s| matches(s, filename))
+}
+
+pub fn database() -> &'static [Syntax] {
+    static DATABASE: std::sync::OnceLock<Vec<Syntax>> = std::sync::OnceLock::new();
+    DATABASE.get_or_init(build_database)
 }
 
 pub fn build_database() -> Vec<Syntax> {
@@ -258,53 +208,58 @@ pub fn build_database() -> Vec<Syntax> {
         html_syntax::html_syntax(),
         css_syntax::css_syntax(),
         markdown_syntax::markdown_syntax(),
+        typescript_syntax::typescript_syntax(),
+        dart_syntax::dart_syntax(),
+        scala_syntax::scala_syntax(),
+        julia_syntax::julia_syntax(),
+        elixir_syntax::elixir_syntax(),
+        erlang_syntax::erlang_syntax(),
+        clojure_syntax::clojure_syntax(),
+        ocaml_syntax::ocaml_syntax(),
+        fsharp_syntax::fsharp_syntax(),
+        powershell_syntax::powershell_syntax(),
+        groovy_syntax::groovy_syntax(),
+        matlab_syntax::matlab_syntax(),
+        fortran_syntax::fortran_syntax(),
+        pascal_syntax::pascal_syntax(),
+        ada_syntax::ada_syntax(),
+        cobol_syntax::cobol_syntax(),
+        assembly_syntax::assembly_syntax(),
+        visualbasic_syntax::visualbasic_syntax(),
+        lisp_syntax::lisp_syntax(),
+        scheme_syntax::scheme_syntax(),
+        nim_syntax::nim_syntax(),
+        crystal_syntax::crystal_syntax(),
+        d_syntax::d_syntax(),
+        tcl_syntax::tcl_syntax(),
+        awk_syntax::awk_syntax(),
+        solidity_syntax::solidity_syntax(),
+        verilog_syntax::verilog_syntax(),
+        vhdl_syntax::vhdl_syntax(),
+        coffeescript_syntax::coffeescript_syntax(),
+        elm_syntax::elm_syntax(),
+        vim_syntax::vim_syntax(),
+        prolog_syntax::prolog_syntax(),
+        fish_syntax::fish_syntax(),
+        nix_syntax::nix_syntax(),
+        toml_syntax::toml_syntax(),
+        ini_syntax::ini_syntax(),
+        xml_syntax::xml_syntax(),
+        latex_syntax::latex_syntax(),
+        diff_syntax::diff_syntax(),
+        hcl_syntax::hcl_syntax(),
+        protobuf_syntax::protobuf_syntax(),
+        graphql_syntax::graphql_syntax(),
+        scss_syntax::scss_syntax(),
+        makefile_syntax::makefile_syntax(),
+        cmake_syntax::cmake_syntax(),
+        dockerfile_syntax::dockerfile_syntax(),
     ]
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_syntax_selection() {
-        let db = build_database();
-        let c = select_for_filename(&db, "main.c");
-        assert!(c.is_some());
-        assert_eq!(c.unwrap().filetype, "c");
-
-        let cpp = select_for_filename(&db, "main.cpp");
-        assert!(cpp.is_some());
-        assert_eq!(cpp.unwrap().filetype, "cpp");
-
-        let py = select_for_filename(&db, "script.py");
-        assert!(py.is_some());
-        assert_eq!(py.unwrap().filetype, "python");
-
-        let js = select_for_filename(&db, "app.ts");
-        assert!(js.is_some());
-        assert_eq!(js.unwrap().filetype, "javascript");
-
-        let rust = select_for_filename(&db, "main.rs");
-        assert!(rust.is_some());
-        assert_eq!(rust.unwrap().filetype, "rust");
-
-        let go = select_for_filename(&db, "main.go");
-        assert!(go.is_some());
-        assert_eq!(go.unwrap().filetype, "go");
-
-        let none = select_for_filename(&db, "data.xyz");
-        assert!(none.is_none());
-    }
-
-    #[test]
-    fn test_update_syntax_keyword() {
-        let db = build_database();
-        let py = select_for_filename(&db, "script.py").unwrap();
-
-        let mut buf = Buffer::new();
-        buf.insert_row(0, "def foo():");
-        update_syntax(&mut buf, 0, Some(py));
-
-        assert_eq!(buf.row(0).hl()[0], Highlight::Keyword1);
-    }
-}
+mod language_samples;
+#[cfg(test)]
+mod parity_tests;
+#[cfg(test)]
+mod tests;

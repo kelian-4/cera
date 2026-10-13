@@ -10,6 +10,13 @@ pub struct ThemeColors {
     pub keyword2: u32,
     pub string_color: u32,
     pub number: u32,
+    pub type_color: u32,
+    pub function_color: u32,
+    pub constant: u32,
+    pub operator: u32,
+    pub preprocessor: u32,
+    pub variable: u32,
+    pub escape: u32,
     pub match_color: u32,
     pub line_number_fg: u32,
     pub error_fg: u32,
@@ -26,6 +33,13 @@ impl Default for ThemeColors {
             keyword2: 0x8CF5D6,
             string_color: 0xA8E6CF,
             number: 0xC9A8FF,
+            type_color: 0xFFD08A,
+            function_color: 0xF9A8D4,
+            constant: 0xFF8FA3,
+            operator: 0xB4C2D4,
+            preprocessor: 0xD4E27A,
+            variable: 0xFFC6A5,
+            escape: 0xFFB86B,
             match_color: 0xFFFF66,
             line_number_fg: 0x7BA3C9,
             error_fg: 0xFF8A8A,
@@ -58,7 +72,13 @@ impl Default for Config {
             mouse_enabled: true,
             theme: ThemeColors::default(),
             language: None,
-            plugins_enabled: vec!["file-explorer".to_string(), "pretty-cat".to_string()],
+            plugins_enabled: vec![
+                "file-explorer".to_string(),
+                "pretty-cat".to_string(),
+                "finder".to_string(),
+                "diff".to_string(),
+                "grep".to_string(),
+            ],
             plugins_directory: None,
         }
     }
@@ -103,7 +123,7 @@ fn default_config_json() -> String {
   "mouse_enabled": true,
   "language": null,
   "plugins": {
-    "enabled": ["file-explorer", "pretty-cat"],
+    "enabled": ["file-explorer", "pretty-cat", "finder", "diff", "grep"],
     "directory": null
   },
   "theme": {
@@ -113,6 +133,13 @@ fn default_config_json() -> String {
     "keyword2": "#8CF5D6",
     "string": "#A8E6CF",
     "number": "#C9A8FF",
+    "type": "#FFD08A",
+    "function": "#F9A8D4",
+    "constant": "#FF8FA3",
+    "operator": "#B4C2D4",
+    "preprocessor": "#D4E27A",
+    "variable": "#FFC6A5",
+    "escape": "#FFB86B",
     "match": "#FFFF66",
     "line_number_fg": "#7BA3C9",
     "error_fg": "#FF8A8A",
@@ -213,6 +240,13 @@ pub fn load_from_file(path: &str) -> (Config, bool) {
             apply_theme_field(theme, "keyword2", &mut cfg.theme.keyword2);
             apply_theme_field(theme, "string", &mut cfg.theme.string_color);
             apply_theme_field(theme, "number", &mut cfg.theme.number);
+            apply_theme_field(theme, "type", &mut cfg.theme.type_color);
+            apply_theme_field(theme, "function", &mut cfg.theme.function_color);
+            apply_theme_field(theme, "constant", &mut cfg.theme.constant);
+            apply_theme_field(theme, "operator", &mut cfg.theme.operator);
+            apply_theme_field(theme, "preprocessor", &mut cfg.theme.preprocessor);
+            apply_theme_field(theme, "variable", &mut cfg.theme.variable);
+            apply_theme_field(theme, "escape", &mut cfg.theme.escape);
             apply_theme_field(theme, "match", &mut cfg.theme.match_color);
             apply_theme_field(theme, "line_number_fg", &mut cfg.theme.line_number_fg);
             apply_theme_field(theme, "error_fg", &mut cfg.theme.error_fg);
@@ -236,7 +270,13 @@ mod tests {
         assert_eq!(cfg.quit_times, 1);
         assert_eq!(
             cfg.plugins_enabled,
-            vec!["file-explorer".to_string(), "pretty-cat".to_string()]
+            vec![
+                "file-explorer".to_string(),
+                "pretty-cat".to_string(),
+                "finder".to_string(),
+                "diff".to_string(),
+                "grep".to_string()
+            ]
         );
         assert_eq!(cfg.plugins_directory, None);
     }
@@ -289,6 +329,45 @@ mod tests {
         assert_eq!(cfg.theme.keyword1, 0xff0000);
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_config_loads_syntax_class_colors() {
+        let path = "/tmp/cera_rust_test_config_syntax_colors.json";
+        let mut f = fs::File::create(path).unwrap();
+        writeln!(
+            f,
+            r##"{{"theme": {{"type": "#010203", "function": "#040506", "constant": "#070809", "operator": "#0a0b0c", "preprocessor": "#0d0e0f", "variable": "#101112", "escape": "#131415"}}}}"##
+        )
+        .unwrap();
+
+        let (cfg, loaded) = load_from_file(path);
+        assert!(loaded);
+        assert_eq!(cfg.theme.type_color, 0x010203);
+        assert_eq!(cfg.theme.function_color, 0x040506);
+        assert_eq!(cfg.theme.constant, 0x070809);
+        assert_eq!(cfg.theme.operator, 0x0a0b0c);
+        assert_eq!(cfg.theme.preprocessor, 0x0d0e0f);
+        assert_eq!(cfg.theme.variable, 0x101112);
+        assert_eq!(cfg.theme.escape, 0x131415);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_default_config_json_lists_every_syntax_color() {
+        let json = default_config_json();
+        for key in [
+            "type",
+            "function",
+            "constant",
+            "operator",
+            "preprocessor",
+            "variable",
+            "escape",
+        ] {
+            assert!(json.contains(&format!("\"{}\":", key)), "missing {key}");
+        }
     }
 
     #[test]

@@ -1,12 +1,16 @@
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::os::fd::AsFd;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use nix::poll::{poll, PollFd, PollFlags};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use nix::sys::termios::{
     self, InputFlags, LocalFlags, OutputFlags, SetArg, SpecialCharacterIndices,
 };
+
+const LONE_ESCAPE_TIMEOUT_MS: u16 = 30;
+const ESCAPE_SEQUENCE_TIMEOUT_MS: u16 = 100;
 
 pub const NO_KEY: i32 = -2;
 pub const BACKSPACE: i32 = 127;
@@ -24,6 +28,10 @@ pub const CTRL_ARROW_LEFT: i32 = 1010;
 pub const CTRL_ARROW_RIGHT: i32 = 1011;
 pub const CTRL_ARROW_UP: i32 = 1012;
 pub const CTRL_ARROW_DOWN: i32 = 1013;
+pub const PASTE_EVENT: i32 = 1020;
+const MAX_PASTE_BYTES: usize = 256 * 1024 * 1024;
+const PASTE_IDLE_ATTEMPTS: u32 = 20;
+const PASTE_END: &[u8] = b"\x1b[201~";
 
 const CODEPOINT_BASE: i32 = 0x110000;
 
@@ -60,6 +68,7 @@ pub struct Terminal {
     orig_termios: termios::Termios,
     raw_mode_enabled: bool,
     last_mouse: MouseEvent,
+    last_paste: String,
 }
 
 impl Terminal {
@@ -71,10 +80,11 @@ impl Terminal {
             orig_termios: orig_termios.clone(),
             raw_mode_enabled: false,
             last_mouse: MouseEvent::default(),
+            last_paste: String::new(),
         };
 
         term.enable_raw_mode()?;
-        term.write(b"\x1b[?1049h");
+        term.write(b"\x1b[?1049h\x1b[?2004h");
 
         Ok(term)
     }
@@ -125,12 +135,38 @@ impl Terminal {
 
     pub fn shutdown(&mut self) {
         self.disable_mouse_reporting();
-        self.write(b"\x1b[?1049l");
+        self.write(b"\x1b[?2004l\x1b[?1049l");
         self.disable_raw_mode();
     }
 
     pub fn last_mouse_event(&self) -> MouseEvent {
         self.last_mouse
+    }
+
+    pub fn take_paste(&mut self) -> String {
+        std::mem::take(&mut self.last_paste)
+    }
+
+    fn read_bracketed_paste(&mut self) -> io::Result<i32> {
+        let mut data: Vec<u8> = Vec::new();
+        let mut idle = 0;
+        while idle < PASTE_IDLE_ATTEMPTS && data.len() < MAX_PASTE_BYTES {
+            match self.read_byte_raw() {
+                Ok(Some(byte)) => {
+                    idle = 0;
+                    data.push(byte);
+                    if data.ends_with(PASTE_END) {
+                        data.truncate(data.len() - PASTE_END.len());
+                        break;
+                    }
+                }
+                Ok(None) => idle += 1,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                Err(error) => return Err(error),
+            }
+        }
+        self.last_paste = String::from_utf8_lossy(&data).into_owned();
+        Ok(PASTE_EVENT)
     }
 
     pub fn install_resize_handler() {
@@ -159,11 +195,29 @@ impl Terminal {
 
     fn read_byte_raw(&self) -> io::Result<Option<u8>> {
         let mut buf = [0u8; 1];
-        match io::stdin().read(&mut buf) {
+        match nix::unistd::read(libc::STDIN_FILENO, &mut buf) {
             Ok(0) => Ok(None),
             Ok(_) => Ok(Some(buf[0])),
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(e) => Err(e),
+            Err(errno) => {
+                let error = io::Error::from(errno);
+                if error.kind() == io::ErrorKind::WouldBlock {
+                    Ok(None)
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+
+    fn wait_for_input(&self, timeout_ms: u16) -> bool {
+        let stdin = io::stdin();
+        let mut fds = [PollFd::new(&stdin, PollFlags::POLLIN)];
+        loop {
+            match poll(&mut fds, i32::from(timeout_ms)) {
+                Ok(ready) => return ready > 0,
+                Err(nix::errno::Errno::EINTR) => continue,
+                Err(_) => return false,
+            }
         }
     }
 
@@ -196,14 +250,11 @@ impl Terminal {
         Ok((rows, cols))
     }
 
-    fn read_byte_after_escape(&self) -> io::Result<Option<u8>> {
-        for _ in 0..20 {
-            if let Some(b) = self.read_byte_raw()? {
-                return Ok(Some(b));
-            }
-            std::thread::sleep(std::time::Duration::from_millis(1));
+    fn read_byte_after_escape(&self, timeout_ms: u16) -> io::Result<Option<u8>> {
+        if !self.wait_for_input(timeout_ms) {
+            return Ok(None);
         }
-        Ok(None)
+        self.read_byte_raw()
     }
 
     pub fn read_key(&mut self) -> io::Result<i32> {
@@ -213,11 +264,11 @@ impl Terminal {
         };
 
         if first == 0x1b {
-            let seq0 = match self.read_byte_after_escape()? {
+            let seq0 = match self.read_byte_after_escape(LONE_ESCAPE_TIMEOUT_MS)? {
                 Some(b) => b,
                 None => return Ok(0x1b),
             };
-            let seq1 = match self.read_byte_after_escape()? {
+            let seq1 = match self.read_byte_after_escape(ESCAPE_SEQUENCE_TIMEOUT_MS)? {
                 Some(b) => b,
                 None => return Ok(0x1b),
             };
@@ -236,6 +287,12 @@ impl Terminal {
                     }
                     if next == b'~' {
                         let code: i32 = num.parse().unwrap_or(0);
+                        if code == 200 {
+                            return self.read_bracketed_paste();
+                        }
+                        if code == 201 {
+                            return Ok(NO_KEY);
+                        }
                         return Ok(match code {
                             1 | 7 => HOME_KEY,
                             3 => DEL_KEY,
@@ -419,7 +476,7 @@ fn get_window_size_ioctl() -> Option<(u16, u16)> {
 }
 
 pub fn die(context: &str) -> ! {
-    let _ = io::stdout().write_all(b"\x1b[?1049l");
+    let _ = io::stdout().write_all(b"\x1b[?2004l\x1b[?1049l");
     let _ = io::stdout().flush();
     eprintln!("{}: {}", context, io::Error::last_os_error());
     std::process::exit(1);

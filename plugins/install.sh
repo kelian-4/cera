@@ -21,4 +21,4 @@ for plugin_dir in "$SCRIPT_DIR"/*/; do
     cp -r "$plugin_dir" "$DEST_BASE/$name"
 done
 
-echo "Termine. Les plugins installes sont actives par defaut dans config.json (champ \"plugins.enabled\")."
+echo "Termine. Un plugin n'est actif que s'il est dans \"plugins.enabled\" de config.json (sans cette liste, tous les plugins par defaut sont actifs)."

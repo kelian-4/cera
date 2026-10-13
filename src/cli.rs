@@ -7,6 +7,17 @@ pub enum Command {
     Show {
         files: Vec<String>,
     },
+    Find {
+        name: String,
+    },
+    Grep {
+        pattern: String,
+        paths: Vec<String>,
+    },
+    Diff {
+        files: Vec<String>,
+    },
+    Help,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -14,15 +25,46 @@ pub enum CliError {
     UnknownOption(String),
     ShowWithoutFile,
     ShowAndExplorer,
+    IncompatibleOptions,
+    FindExpectsOneName,
+    GrepWithoutPattern,
+    DiffNeedsTwoFiles,
 }
 
 fn is_option(arg: &str) -> bool {
     arg.len() > 1 && arg.starts_with('-')
 }
 
+fn single_argument(mut positional: Vec<String>) -> Option<String> {
+    let first = if positional.is_empty() {
+        None
+    } else {
+        Some(positional.remove(0))
+    };
+    if positional.is_empty() {
+        first
+    } else {
+        None
+    }
+}
+
+fn help_requested<S: AsRef<str>>(args: &[S]) -> bool {
+    args.iter()
+        .map(|arg| arg.as_ref())
+        .take_while(|arg| *arg != "--")
+        .any(|arg| arg == "-h" || arg == "--help")
+}
+
 pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
+    if help_requested(args) {
+        return Ok(Command::Help);
+    }
+
     let mut explorer_requested = false;
     let mut show_requested = false;
+    let mut find_requested = false;
+    let mut grep_requested = false;
+    let mut diff_requested = false;
     let mut positional: Vec<String> = Vec::new();
     let mut options_done = false;
 
@@ -36,12 +78,29 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
             "--" => options_done = true,
             "-e" | "--explorer" => explorer_requested = true,
             "-a" | "--afficher" => show_requested = true,
+            "-f" | "--find" => find_requested = true,
+            "-g" | "--grep" => grep_requested = true,
+            "-d" | "--diff" => diff_requested = true,
             other => return Err(CliError::UnknownOption(other.to_string())),
         }
     }
 
-    if show_requested && explorer_requested {
-        return Err(CliError::ShowAndExplorer);
+    let requested = [
+        show_requested,
+        explorer_requested,
+        find_requested,
+        grep_requested,
+        diff_requested,
+    ]
+    .iter()
+    .filter(|r| **r)
+    .count();
+
+    if requested > 1 {
+        if show_requested && explorer_requested && requested == 2 {
+            return Err(CliError::ShowAndExplorer);
+        }
+        return Err(CliError::IncompatibleOptions);
     }
 
     if show_requested {
@@ -49,6 +108,30 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
             return Err(CliError::ShowWithoutFile);
         }
         return Ok(Command::Show { files: positional });
+    }
+
+    if find_requested {
+        return single_argument(positional)
+            .map(|name| Command::Find { name })
+            .ok_or(CliError::FindExpectsOneName);
+    }
+
+    if grep_requested {
+        let mut iter = positional.into_iter();
+        return match iter.next() {
+            Some(pattern) => Ok(Command::Grep {
+                pattern,
+                paths: iter.collect(),
+            }),
+            None => Err(CliError::GrepWithoutPattern),
+        };
+    }
+
+    if diff_requested {
+        if positional.len() < 2 {
+            return Err(CliError::DiffNeedsTwoFiles);
+        }
+        return Ok(Command::Diff { files: positional });
     }
 
     if explorer_requested {
@@ -191,6 +274,116 @@ mod tests {
             Ok(Command::Edit {
                 explorer: None,
                 files: vec!["-".into()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_find_takes_one_name() {
+        for flag in ["-f", "--find"] {
+            assert_eq!(
+                p(&[flag, "main"]),
+                Ok(Command::Find {
+                    name: "main".into()
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn test_find_requires_exactly_one_name() {
+        assert_eq!(p(&["-f"]), Err(CliError::FindExpectsOneName));
+        assert_eq!(p(&["-f", "a", "b"]), Err(CliError::FindExpectsOneName));
+    }
+
+    #[test]
+    fn test_grep_takes_pattern_without_paths() {
+        for flag in ["-g", "--grep"] {
+            assert_eq!(
+                p(&[flag, "fn main"]),
+                Ok(Command::Grep {
+                    pattern: "fn main".into(),
+                    paths: vec![]
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn test_grep_takes_pattern_then_paths() {
+        assert_eq!(
+            p(&["-g", "fn main", "src/main.rs", "plugins"]),
+            Ok(Command::Grep {
+                pattern: "fn main".into(),
+                paths: vec!["src/main.rs".into(), "plugins".into()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_grep_requires_a_pattern() {
+        assert_eq!(p(&["-g"]), Err(CliError::GrepWithoutPattern));
+    }
+
+    #[test]
+    fn test_grep_pattern_starting_with_dash_needs_double_dash() {
+        assert_eq!(
+            p(&["-g", "--", "-x", "src"]),
+            Ok(Command::Grep {
+                pattern: "-x".into(),
+                paths: vec!["src".into()]
+            })
+        );
+    }
+
+    #[test]
+    fn test_diff_takes_two_or_more_files() {
+        for flag in ["-d", "--diff"] {
+            assert_eq!(
+                p(&[flag, "a", "b", "c"]),
+                Ok(Command::Diff {
+                    files: vec!["a".into(), "b".into(), "c".into()]
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn test_diff_requires_two_files() {
+        assert_eq!(p(&["-d"]), Err(CliError::DiffNeedsTwoFiles));
+        assert_eq!(p(&["-d", "a"]), Err(CliError::DiffNeedsTwoFiles));
+    }
+
+    #[test]
+    fn test_modes_are_mutually_exclusive() {
+        assert_eq!(p(&["-f", "-g", "x"]), Err(CliError::IncompatibleOptions));
+        assert_eq!(
+            p(&["-d", "-a", "x", "y"]),
+            Err(CliError::IncompatibleOptions)
+        );
+        assert_eq!(p(&["-e", "-f", "x"]), Err(CliError::IncompatibleOptions));
+    }
+
+    #[test]
+    fn test_help_flags() {
+        for flag in ["-h", "--help"] {
+            assert_eq!(p(&[flag]), Ok(Command::Help));
+        }
+    }
+
+    #[test]
+    fn test_help_takes_priority_over_other_arguments() {
+        assert_eq!(p(&["-g", "x", "--help"]), Ok(Command::Help));
+        assert_eq!(p(&["--bogus", "-h"]), Ok(Command::Help));
+    }
+
+    #[test]
+    fn test_help_after_double_dash_is_a_plain_argument() {
+        assert_eq!(
+            p(&["--", "-h"]),
+            Ok(Command::Edit {
+                explorer: None,
+                files: vec!["-h".into()]
             })
         );
     }
