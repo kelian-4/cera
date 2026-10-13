@@ -1,4 +1,4 @@
-**Français** | [English](en/README.en.md)
+**Français** | [English](docs/en/README.en.md)
 
 # Cera
 
@@ -64,6 +64,14 @@ cargo build --release
 Les plugins fournis demandent `python3`.
 
 ## Utilisation
+
+### Sans plugin
+
+```
+cera [fichier]
+```
+
+### Avec plugin
 
 ```
 cera [options] [fichier ...]
