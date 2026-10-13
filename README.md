@@ -11,11 +11,11 @@ Cera est un éditeur de texte pour le terminal, écrit en Rust.
 
 ## Qu'est-ce que Cera ?
 
-Cera est un éditeur cli simple à prendre en main. Il est pense comme une alternative plus moderne et plus intuitive aux éditeur classiques avec un système de plugins pouvant être écrits en C++, C, Rust, JS, Python permettant d'etendre ou modifier l'editeur a son bon vouloir sans modifier le code source.
+Cera est un éditeur cli simple à prendre en main. Il est pensé comme une alternative plus moderne et plus intuitive aux éditeurs classiques avec un système de plugins pouvant être écrits en C++, C, Rust, JS, Python permettant d'étendre ou de modifier l'éditeur à son bon vouloir sans modifier le code source.
 
 ## Images 
 
-File explore
+File explorer
 
 <img width="1341" height="706" alt="2026-10-12_08:13:40" src="https://github.com/user-attachments/assets/efbd73e4-edda-4c00-bc57-7cb2b39db7ac" />
 
@@ -49,7 +49,7 @@ inputs.cera = {
 # dans la liste des modules :
 { environment.systemPackages = [ inputs.cera.packages.${system}.default ]; }
 ```
-les plugins sont installés dans `~/.config/cera/plugins` ou dans `plugins.directory` de `config.json` : voir [PLUGINS.md](PLUGINS.md).
+Les plugins sont installés dans `~/.config/cera/plugins` ou dans `plugins.directory` de `config.json` : voir [PLUGINS.md](PLUGINS.md).
 
 ### Depuis les sources
 
