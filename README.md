@@ -65,6 +65,14 @@ Les plugins fournis demandent `python3`.
 
 ## Utilisation
 
+### Sans plugin
+
+```
+cera [fichier]
+```
+
+### Avec plugin
+
 ```
 cera [options] [fichier ...]
 ```

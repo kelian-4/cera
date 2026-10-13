@@ -1,4 +1,4 @@
-[Français](../README.md) | **English**
+[Français](../../README.md) | **English**
 
 # Cera
 
@@ -49,6 +49,14 @@ cargo build --release
 The bundled plugins require `python3`.
 
 ## Usage
+
+### Without plugin
+
+```
+cera [file]
+```
+
+### With plugin
 
 ```
 cera [options] [file ...]
