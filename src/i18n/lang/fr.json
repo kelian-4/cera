@@ -92,6 +92,7 @@
   "cli.help.grep": "Cherche un texte dans des fichiers et dossiers",
   "cli.help.diff": "Compare chaque fichier au premier",
   "cli.help.help": "Affiche cette aide",
+  "cli.help.version": "Affiche la version",
   "cli.help.plugins": "Plugins actifs :",
   "cli.is_a_directory_use_e": "\"%s\" est un repertoire, utilisez -e pour l'explorer",
   "cli.is_a_directory_enable_plugin": "\"%s\" est un repertoire, activez le plugin file-explorer pour ouvrir des dossiers",

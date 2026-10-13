@@ -30,7 +30,13 @@ fn main() {
         }
         Command::Edit { explorer, files } => run_edit(explorer, &files),
         Command::Help => run_help(),
+        Command::Version => run_version(),
     }
+}
+
+fn run_version() -> ! {
+    println!("cera {}", env!("CARGO_PKG_VERSION"));
+    std::process::exit(0);
 }
 
 fn run_help() -> ! {
