@@ -118,4 +118,4 @@ First check whether the problem has already been reported in the [issues](https:
 
 ## License
 
-Cera is distributed under the GNU GPL version 3 or later: see [LICENSE](../LICENSE).
+Cera is distributed under the GNU GPL version 3 or later: see [LICENSE](../../LICENSE).

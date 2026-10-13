@@ -1,4 +1,4 @@
-**Français** | [English](en/README.en.md)
+**Français** | [English](docs/en/README.en.md)
 
 # Cera
 
