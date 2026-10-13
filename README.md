@@ -4,9 +4,8 @@
 
 Cera est un éditeur de texte pour le terminal, écrit en Rust.
 
-<p>
-  <img width="49%" alt="2026-10-12_08:11:54" src="https://github.com/user-attachments/assets/f9f8b026-e080-4947-8b75-53dda044eb3f" />
-  <img width="49%" alt="2026-10-12_08:13:12" src="https://github.com/user-attachments/assets/ebb3ec6a-f533-467f-adba-46a9f7e5bc4a" />
+<p align="center">
+  <img src="docs/cera-demo.gif" alt="Démonstration de Cera" width="100%" />
 </p>
 
 
