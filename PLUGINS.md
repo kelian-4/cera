@@ -1,4 +1,4 @@
-**Français** | [English](PLUGINS.en.md)
+**Français** | [English](en/PLUGINS.en.md)
 
 # Plugins
 
