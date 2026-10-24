@@ -41,7 +41,7 @@
   "doc.next_file": "Switch to the next file",
   "doc.prev_file": "Switch to the previous file",
   "doc.arrows": "Arrows",
-  "doc.arrows_desc": "Move the cursor",
+  "doc.arrows_desc": "Move the cursor (Down on the last line adds a line)",
   "doc.ctrl_arrow": "Ctrl-Arrow",
   "doc.ctrl_arrow_desc": "Extend the selection",
   "doc.toggle_help": "Show/hide the help bar",

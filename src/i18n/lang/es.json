@@ -41,7 +41,7 @@
   "doc.next_file": "Pasar al archivo siguiente",
   "doc.prev_file": "Pasar al archivo anterior",
   "doc.arrows": "Flechas",
-  "doc.arrows_desc": "Mover el cursor",
+  "doc.arrows_desc": "Mueve el cursor (Abajo en la ultima linea anade una linea)",
   "doc.ctrl_arrow": "Ctrl-Flecha",
   "doc.ctrl_arrow_desc": "Extender la seleccion",
   "doc.toggle_help": "Mostrar/ocultar la barra de ayuda",
