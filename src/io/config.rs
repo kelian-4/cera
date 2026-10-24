@@ -151,15 +151,27 @@ fn default_config_json() -> String {
 }
 
 pub fn ensure_config_file_exists(path: &str) {
+    ensure_config_file_exists_with(path, crate::plugin::install::bundled_plugins_directory());
+}
+
+fn ensure_config_file_exists_with(path: &str, bundled_plugins: Option<std::path::PathBuf>) {
     if fs::metadata(path).is_ok() {
         return;
     }
-    if let Some(parent) = std::path::Path::new(path).parent() {
+    let parent = std::path::Path::new(path).parent();
+    if let Some(parent) = parent {
         if !parent.as_os_str().is_empty() {
             let _ = fs::create_dir_all(parent);
         }
     }
-    let _ = fs::write(path, default_config_json());
+    if fs::write(path, default_config_json()).is_err() {
+        return;
+    }
+    if let (Some(source), Some(parent)) = (bundled_plugins, parent) {
+        if !parent.as_os_str().is_empty() {
+            crate::plugin::install::install_bundled_plugins(&source, &parent.join("plugins"));
+        }
+    }
 }
 
 pub fn load_from_file(path: &str) -> (Config, bool) {
@@ -415,5 +427,56 @@ mod tests {
         );
 
         let _ = fs::remove_file(path);
+    }
+
+    fn bundled_plugins_fixture(name: &str) -> std::path::PathBuf {
+        let source = std::path::PathBuf::from(format!("/tmp/cera_rust_test_bundled_{}", name));
+        let _ = fs::remove_dir_all(&source);
+        fs::create_dir_all(source.join("finder")).unwrap();
+        fs::write(source.join("finder/plugin.json"), "{}").unwrap();
+        source
+    }
+
+    #[test]
+    fn test_ensure_config_installs_bundled_plugins_next_to_new_config() {
+        let dir = "/tmp/cera_rust_test_ensure_installs";
+        let _ = fs::remove_dir_all(dir);
+        let source = bundled_plugins_fixture("installs");
+        let path = format!("{}/config.json", dir);
+
+        ensure_config_file_exists_with(&path, Some(source.clone()));
+
+        assert!(fs::metadata(format!("{}/plugins/finder/plugin.json", dir)).is_ok());
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(source);
+    }
+
+    #[test]
+    fn test_ensure_config_does_not_install_plugins_when_config_exists() {
+        let dir = "/tmp/cera_rust_test_ensure_existing";
+        let _ = fs::remove_dir_all(dir);
+        fs::create_dir_all(dir).unwrap();
+        let path = format!("{}/config.json", dir);
+        fs::write(&path, "{}").unwrap();
+        let source = bundled_plugins_fixture("existing");
+
+        ensure_config_file_exists_with(&path, Some(source.clone()));
+
+        assert!(fs::metadata(format!("{}/plugins", dir)).is_err());
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(source);
+    }
+
+    #[test]
+    fn test_ensure_config_without_bundled_plugins_creates_no_plugins_dir() {
+        let dir = "/tmp/cera_rust_test_ensure_none";
+        let _ = fs::remove_dir_all(dir);
+        let path = format!("{}/config.json", dir);
+
+        ensure_config_file_exists_with(&path, None);
+
+        assert!(fs::metadata(&path).is_ok());
+        assert!(fs::metadata(format!("{}/plugins", dir)).is_err());
+        let _ = fs::remove_dir_all(dir);
     }
 }

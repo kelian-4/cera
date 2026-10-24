@@ -38,7 +38,7 @@ inputs.cera = {
 # in the list of modules:
 { environment.systemPackages = [ inputs.cera.packages.${system}.default ]; }
 ```
-Plugins are installed in `~/.config/cera/plugins` or in `plugins.directory` from `config.json`: see [PLUGINS.en.md](PLUGINS.en.md).
+On first launch, Cera copies the bundled plugins to `~/.config/cera/plugins` and enables them: see [PLUGINS.en.md](PLUGINS.en.md).
 
 ### From source
 

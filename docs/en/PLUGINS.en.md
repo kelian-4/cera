@@ -64,6 +64,10 @@ The command-line options are **built into Cera**: a third-party plugin cannot ad
 
 ## Installation and activation
 
+On first launch, when `config.json` does not exist yet, Cera creates it with the bundled plugins in `plugins.enabled` and copies them to `~/.config/cera/plugins/` (Nix, `.deb`, `.rpm` packages, `.tar.gz` archive). An existing `config.json` is never modified and a plugin that is already present is never overwritten.
+
+From source, or after changing a plugin:
+
 ```
 ./plugins/install.sh
 ```
