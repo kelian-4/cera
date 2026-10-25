@@ -34,23 +34,54 @@ fn copy_directory(source: &Path, destination: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn install_bundled_plugins(source: &Path, destination: &Path) {
+const VERSION_FILE: &str = ".cera-version";
+
+fn replace_plugin(source: &Path, target: &Path) -> std::io::Result<()> {
+    let name = target.file_name().unwrap_or_default().to_string_lossy();
+    let staging = target.with_file_name(format!(".{}.new", name));
+    let _ = fs::remove_dir_all(&staging);
+    if let Err(error) = copy_directory(source, &staging) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(error);
+    }
+    if target.exists() {
+        fs::remove_dir_all(target)?;
+    }
+    fs::rename(&staging, target)
+}
+
+pub fn install_bundled_plugins(source: &Path, destination: &Path, version: &str) {
     let Ok(entries) = fs::read_dir(source) else {
         return;
     };
+    if fs::create_dir_all(destination).is_err() {
+        return;
+    }
+    let mut all_installed = true;
     for entry in entries.flatten() {
         let plugin_directory = entry.path();
         if !plugin_directory.join("plugin.json").is_file() {
             continue;
         }
         let target = destination.join(entry.file_name());
-        if target.exists() {
-            continue;
-        }
-        if copy_directory(&plugin_directory, &target).is_err() {
-            let _ = fs::remove_dir_all(&target);
+        if replace_plugin(&plugin_directory, &target).is_err() {
+            all_installed = false;
         }
     }
+    if all_installed {
+        let _ = fs::write(destination.join(VERSION_FILE), version);
+    }
+}
+
+pub fn update_bundled_plugins(source: &Path, destination: &Path, version: &str) {
+    if !destination.is_dir() {
+        return;
+    }
+    let installed_version = fs::read_to_string(destination.join(VERSION_FILE)).unwrap_or_default();
+    if installed_version.trim() == version {
+        return;
+    }
+    install_bundled_plugins(source, destination, version);
 }
 
 #[cfg(test)]
@@ -80,11 +111,25 @@ mod tests {
         let destination = root.join("destination");
         write_plugin(&source, "finder");
         write_plugin(&source, "grep");
-        install_bundled_plugins(&source, &destination);
+        install_bundled_plugins(&source, &destination, "1.0.0");
         assert!(destination.join("finder/plugin.json").is_file());
         assert!(destination.join("finder/main.py").is_file());
         assert!(destination.join("finder/nested/data.json").is_file());
         assert!(destination.join("grep/plugin.json").is_file());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_install_writes_the_version_marker() {
+        let root = temp_dir("marker");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        write_plugin(&source, "finder");
+        install_bundled_plugins(&source, &destination, "1.2.3");
+        assert_eq!(
+            fs::read_to_string(destination.join(VERSION_FILE)).unwrap(),
+            "1.2.3"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -96,7 +141,7 @@ mod tests {
         fs::create_dir_all(source.join("not-a-plugin")).unwrap();
         fs::write(source.join("install.sh"), "#!/bin/sh").unwrap();
         let destination = root.join("destination");
-        install_bundled_plugins(&source, &destination);
+        install_bundled_plugins(&source, &destination, "1.0.0");
         assert!(destination.join("finder").is_dir());
         assert!(!destination.join("not-a-plugin").exists());
         assert!(!destination.join("install.sh").exists());
@@ -104,19 +149,33 @@ mod tests {
     }
 
     #[test]
-    fn test_install_never_overwrites_an_existing_plugin() {
-        let root = temp_dir("keep");
+    fn test_install_replaces_an_existing_bundled_plugin() {
+        let root = temp_dir("replace");
         let source = root.join("source");
         let destination = root.join("destination");
         write_plugin(&source, "finder");
         fs::create_dir_all(destination.join("finder")).unwrap();
-        fs::write(destination.join("finder/main.py"), "mine").unwrap();
-        install_bundled_plugins(&source, &destination);
+        fs::write(destination.join("finder/main.py"), "old").unwrap();
+        fs::write(destination.join("finder/stale.py"), "old").unwrap();
+        install_bundled_plugins(&source, &destination, "1.0.0");
         assert_eq!(
             fs::read_to_string(destination.join("finder/main.py")).unwrap(),
-            "mine"
+            "print()"
         );
-        assert!(!destination.join("finder/plugin.json").exists());
+        assert!(!destination.join("finder/stale.py").exists());
+        assert!(!destination.join(".finder.new").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_install_keeps_custom_plugins() {
+        let root = temp_dir("custom");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        write_plugin(&source, "finder");
+        write_plugin(&destination, "mine");
+        install_bundled_plugins(&source, &destination, "1.0.0");
+        assert!(destination.join("mine/plugin.json").is_file());
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -131,7 +190,7 @@ mod tests {
         permissions.set_mode(0o444);
         fs::set_permissions(source.join("finder/main.py"), permissions).unwrap();
         let destination = root.join("destination");
-        install_bundled_plugins(&source, &destination);
+        install_bundled_plugins(&source, &destination, "1.0.0");
         let mode = fs::metadata(destination.join("finder/main.py"))
             .unwrap()
             .permissions()
@@ -144,7 +203,70 @@ mod tests {
     fn test_install_with_missing_source_does_nothing() {
         let root = temp_dir("missing");
         let destination = root.join("destination");
-        install_bundled_plugins(&root.join("nope"), &destination);
+        install_bundled_plugins(&root.join("nope"), &destination, "1.0.0");
+        assert!(!destination.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_update_replaces_plugins_when_the_version_changes() {
+        let root = temp_dir("update_new");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        write_plugin(&source, "finder");
+        install_bundled_plugins(&source, &destination, "1.0.0");
+        fs::write(source.join("finder/main.py"), "print('v2')").unwrap();
+        update_bundled_plugins(&source, &destination, "2.0.0");
+        assert_eq!(
+            fs::read_to_string(destination.join("finder/main.py")).unwrap(),
+            "print('v2')"
+        );
+        assert_eq!(
+            fs::read_to_string(destination.join(VERSION_FILE)).unwrap(),
+            "2.0.0"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_update_does_nothing_when_the_version_is_the_same() {
+        let root = temp_dir("update_same");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        write_plugin(&source, "finder");
+        install_bundled_plugins(&source, &destination, "1.0.0");
+        fs::write(destination.join("finder/main.py"), "edited").unwrap();
+        update_bundled_plugins(&source, &destination, "1.0.0");
+        assert_eq!(
+            fs::read_to_string(destination.join("finder/main.py")).unwrap(),
+            "edited"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_update_handles_plugins_installed_without_a_marker() {
+        let root = temp_dir("update_unmarked");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        write_plugin(&source, "finder");
+        fs::create_dir_all(destination.join("finder")).unwrap();
+        fs::write(destination.join("finder/main.py"), "old").unwrap();
+        update_bundled_plugins(&source, &destination, "1.0.0");
+        assert_eq!(
+            fs::read_to_string(destination.join("finder/main.py")).unwrap(),
+            "print()"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_update_never_creates_a_missing_plugins_directory() {
+        let root = temp_dir("update_missing");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        write_plugin(&source, "finder");
+        update_bundled_plugins(&source, &destination, "1.0.0");
         assert!(!destination.exists());
         let _ = fs::remove_dir_all(&root);
     }

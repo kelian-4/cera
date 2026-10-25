@@ -155,22 +155,26 @@ pub fn ensure_config_file_exists(path: &str) {
 }
 
 fn ensure_config_file_exists_with(path: &str, bundled_plugins: Option<std::path::PathBuf>) {
+    let parent = std::path::Path::new(path)
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty());
+    let plugins_directory = parent.map(|parent| parent.join("plugins"));
+    let version = env!("CARGO_PKG_VERSION");
+
     if fs::metadata(path).is_ok() {
+        if let (Some(source), Some(destination)) = (&bundled_plugins, &plugins_directory) {
+            crate::plugin::install::update_bundled_plugins(source, destination, version);
+        }
         return;
     }
-    let parent = std::path::Path::new(path).parent();
     if let Some(parent) = parent {
-        if !parent.as_os_str().is_empty() {
-            let _ = fs::create_dir_all(parent);
-        }
+        let _ = fs::create_dir_all(parent);
     }
     if fs::write(path, default_config_json()).is_err() {
         return;
     }
-    if let (Some(source), Some(parent)) = (bundled_plugins, parent) {
-        if !parent.as_os_str().is_empty() {
-            crate::plugin::install::install_bundled_plugins(&source, &parent.join("plugins"));
-        }
+    if let (Some(source), Some(destination)) = (&bundled_plugins, &plugins_directory) {
+        crate::plugin::install::install_bundled_plugins(source, destination, version);
     }
 }
 
@@ -478,5 +482,30 @@ mod tests {
         assert!(fs::metadata(&path).is_ok());
         assert!(fs::metadata(format!("{}/plugins", dir)).is_err());
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_ensure_config_updates_installed_plugins_when_the_version_changes() {
+        let dir = "/tmp/cera_rust_test_ensure_update";
+        let _ = fs::remove_dir_all(dir);
+        fs::create_dir_all(format!("{}/plugins/finder", dir)).unwrap();
+        fs::write(format!("{}/plugins/finder/plugin.json", dir), "old").unwrap();
+        fs::write(format!("{}/plugins/.cera-version", dir), "0.0.1").unwrap();
+        let path = format!("{}/config.json", dir);
+        fs::write(&path, "{}").unwrap();
+        let source = bundled_plugins_fixture("update");
+
+        ensure_config_file_exists_with(&path, Some(source.clone()));
+
+        assert_eq!(
+            fs::read_to_string(format!("{}/plugins/finder/plugin.json", dir)).unwrap(),
+            "{}"
+        );
+        assert_eq!(
+            fs::read_to_string(format!("{}/plugins/.cera-version", dir)).unwrap(),
+            env!("CARGO_PKG_VERSION")
+        );
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(source);
     }
 }

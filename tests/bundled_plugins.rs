@@ -89,3 +89,46 @@ fn binary_without_bundled_plugins_creates_no_plugins_directory() {
     assert!(!home.join(".config/cera/plugins").exists());
     let _ = fs::remove_dir_all(&root);
 }
+
+#[test]
+fn new_version_updates_installed_plugins() {
+    let root = fresh_dir("update");
+    let binary = install_layout(&root);
+    let home = root.join("home");
+    fs::create_dir_all(&home).unwrap();
+    run_help(&binary, &home);
+    let plugins = home.join(".config/cera/plugins");
+    fs::write(plugins.join("finder/main.py"), "stale").unwrap();
+    fs::write(plugins.join(".cera-version"), "0.0.1").unwrap();
+
+    run_help(&binary, &home);
+
+    assert_eq!(
+        fs::read_to_string(plugins.join("finder/main.py")).unwrap(),
+        "print('finder')\n"
+    );
+    assert_eq!(
+        fs::read_to_string(plugins.join(".cera-version")).unwrap(),
+        env!("CARGO_PKG_VERSION")
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn same_version_keeps_local_changes() {
+    let root = fresh_dir("same_version");
+    let binary = install_layout(&root);
+    let home = root.join("home");
+    fs::create_dir_all(&home).unwrap();
+    run_help(&binary, &home);
+    let plugins = home.join(".config/cera/plugins");
+    fs::write(plugins.join("finder/main.py"), "edited").unwrap();
+
+    run_help(&binary, &home);
+
+    assert_eq!(
+        fs::read_to_string(plugins.join("finder/main.py")).unwrap(),
+        "edited"
+    );
+    let _ = fs::remove_dir_all(&root);
+}

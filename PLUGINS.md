@@ -64,7 +64,9 @@ Les options de ligne de commande sont **intégrées à Cera** : un plugin tiers 
 
 ## Installation et activation
 
-Au premier lancement, quand `config.json` n'existe pas encore, Cera le crée avec les plugins fournis dans `plugins.enabled` et les copie dans `~/.config/cera/plugins/` (paquets Nix, `.deb`, `.rpm`, archive `.tar.gz`). Un `config.json` existant n'est jamais modifié et un plugin déjà présent n'est jamais écrasé.
+Au premier lancement, quand `config.json` n'existe pas encore, Cera le crée avec les plugins fournis dans `plugins.enabled` et les copie dans `~/.config/cera/plugins/` (paquets Nix, `.deb`, `.rpm`, archive `.tar.gz`). Un `config.json` existant n'est jamais modifié.
+
+À chaque changement de version de Cera, les plugins fournis déjà présents dans `~/.config/cera/plugins/` sont remplacés par la nouvelle version (le fichier `.cera-version` y garde la version installée). Les modifications locales d'un plugin fourni sont donc perdues ; un plugin que vous avez créé sous un autre nom n'est jamais touché.
 
 Depuis les sources, ou après avoir modifié un plugin :
 
