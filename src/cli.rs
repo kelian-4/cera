@@ -18,6 +18,7 @@ pub enum Command {
         files: Vec<String>,
     },
     Help,
+    Version,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -48,16 +49,19 @@ fn single_argument(mut positional: Vec<String>) -> Option<String> {
     }
 }
 
-fn help_requested<S: AsRef<str>>(args: &[S]) -> bool {
+fn option_requested<S: AsRef<str>>(args: &[S], names: &[&str]) -> bool {
     args.iter()
         .map(|arg| arg.as_ref())
         .take_while(|arg| *arg != "--")
-        .any(|arg| arg == "-h" || arg == "--help")
+        .any(|arg| names.contains(&arg))
 }
 
 pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
-    if help_requested(args) {
+    if option_requested(args, &["-h", "--help"]) {
         return Ok(Command::Help);
+    }
+    if option_requested(args, &["-v", "--version"]) {
+        return Ok(Command::Version);
     }
 
     let mut explorer_requested = false;
@@ -375,6 +379,34 @@ mod tests {
     fn test_help_takes_priority_over_other_arguments() {
         assert_eq!(p(&["-g", "x", "--help"]), Ok(Command::Help));
         assert_eq!(p(&["--bogus", "-h"]), Ok(Command::Help));
+    }
+
+    #[test]
+    fn test_version_flag() {
+        assert_eq!(p(&["--version"]), Ok(Command::Version));
+        assert_eq!(p(&["-v"]), Ok(Command::Version));
+    }
+
+    #[test]
+    fn test_version_takes_priority_over_other_arguments() {
+        assert_eq!(p(&["-g", "x", "--version"]), Ok(Command::Version));
+        assert_eq!(p(&["--bogus", "--version"]), Ok(Command::Version));
+    }
+
+    #[test]
+    fn test_help_takes_priority_over_version() {
+        assert_eq!(p(&["--version", "--help"]), Ok(Command::Help));
+    }
+
+    #[test]
+    fn test_version_after_double_dash_is_a_plain_argument() {
+        assert_eq!(
+            p(&["--", "--version"]),
+            Ok(Command::Edit {
+                explorer: None,
+                files: vec!["--version".into()]
+            })
+        );
     }
 
     #[test]

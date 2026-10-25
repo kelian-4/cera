@@ -284,6 +284,20 @@ impl Editor {
         ob.undo_stack.break_coalescing();
     }
 
+    fn move_down_or_append_line(&mut self) {
+        let ob = self.buffer_manager.active_mut();
+        if ob.cursor.cy + 1 < ob.buffer.num_rows() {
+            self.move_cursor(terminal::ARROW_DOWN, false);
+            return;
+        }
+        ob.selection.is_active = false;
+        if ob.cursor.cy < ob.buffer.num_rows() {
+            ob.cursor.cx = ob.buffer.row(ob.cursor.cy).size();
+        }
+        ob.undo_stack.break_coalescing();
+        self.insert_newline();
+    }
+
     fn select_all(&mut self) {
         let ob = self.buffer_manager.active_mut();
         let num_rows = ob.buffer.num_rows();
@@ -2062,10 +2076,9 @@ impl Editor {
                 }
             }
 
-            terminal::ARROW_UP
-            | terminal::ARROW_DOWN
-            | terminal::ARROW_LEFT
-            | terminal::ARROW_RIGHT => {
+            terminal::ARROW_DOWN => self.move_down_or_append_line(),
+
+            terminal::ARROW_UP | terminal::ARROW_LEFT | terminal::ARROW_RIGHT => {
                 self.move_cursor(c, false);
             }
 

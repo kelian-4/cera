@@ -159,6 +159,7 @@ pub fn cli_help_text(
         ("-g, --grep motif [chemin...]", "cli.help.grep"),
         ("-d, --diff fichier1 fichier2...", "cli.help.diff"),
         ("-h, --help", "cli.help.help"),
+        ("-v, --version", "cli.help.version"),
     ];
     let mut text = format!(
         "{}\n\n{}\n",
@@ -230,6 +231,7 @@ mod tests {
             "-g, --grep",
             "-d, --diff",
             "-h, --help",
+            "-v, --version",
         ] {
             assert!(text.contains(flag), "missing {flag}");
         }

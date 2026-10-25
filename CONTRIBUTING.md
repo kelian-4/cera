@@ -1,4 +1,4 @@
-**Français** | [English](en/CONTRIBUTING.en.md)
+**Français** | [English](docs/en/CONTRIBUTING.en.md)
 
 # Contribuer à Cera
 

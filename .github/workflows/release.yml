@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Paquets ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installer la toolchain Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
+
+      - name: Lire la version
+        id: version
+        shell: bash
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "le tag $GITHUB_REF_NAME ne correspond pas a la version $version de Cargo.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Installer rpm
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rpm
+
+      - name: Build release
+        run: cargo build --release --locked
+
+      - name: Verifier la version du binaire
+        shell: bash
+        run: |
+          test "$(./target/release/cera --version)" = "cera ${{ steps.version.outputs.version }}"
+
+      - name: Construire les paquets
+        run: bash packaging/build-packages.sh "${{ steps.version.outputs.version }}" "${{ matrix.arch }}"
+
+      - name: Tester le paquet deb
+        run: |
+          sudo apt-get install -y ./dist/cera_*.deb
+          cera --version
+          test -f /usr/share/cera/plugins/pretty-cat/plugin.json
+
+      - name: Publier les artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: paquets-${{ matrix.arch }}
+          path: dist/*
+
+  release:
+    name: Publier la release
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Telecharger les paquets
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Sommes de controle
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+
+      - name: Creer la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag

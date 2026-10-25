@@ -1,4 +1,4 @@
-**Français** | [English](en/PLUGINS.en.md)
+**Français** | [English](docs/en/PLUGINS.en.md)
 
 # Plugins
 
@@ -63,6 +63,12 @@ Ajoutez `"bonjour"` à `plugins.enabled` dans `config.json`, relancez Cera et ta
 Les options de ligne de commande sont **intégrées à Cera** : un plugin tiers ne peut pas en ajouter sans modifier le code de Cera. Pour les quatre plugins fournis, Cera exécute `<command> <args du manifeste> --cat|--find|--grep|--diff <arguments de l'utilisateur>`, laisse le plugin écrire directement sur la sortie standard, et sort avec le code de sortie du plugin.
 
 ## Installation et activation
+
+Au premier lancement, quand `config.json` n'existe pas encore, Cera le crée avec les plugins fournis dans `plugins.enabled` et les copie dans `~/.config/cera/plugins/` (paquets Nix, `.deb`, `.rpm`, archive `.tar.gz`). Un `config.json` existant n'est jamais modifié.
+
+À chaque changement de version de Cera, les plugins fournis déjà présents dans `~/.config/cera/plugins/` sont remplacés par la nouvelle version (le fichier `.cera-version` y garde la version installée). Les modifications locales d'un plugin fourni sont donc perdues ; un plugin que vous avez créé sous un autre nom n'est jamais touché.
+
+Depuis les sources, ou après avoir modifié un plugin :
 
 ```
 ./plugins/install.sh

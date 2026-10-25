@@ -1,4 +1,4 @@
-[Français](../PLUGINS.md) | **English**
+[Français](../../PLUGINS.md) | **English**
 
 # Plugins
 
@@ -63,6 +63,12 @@ Add `"hello"` to `plugins.enabled` in `config.json`, restart Cera and press `Ctr
 The command-line options are **built into Cera**: a third-party plugin cannot add one without changing Cera's code. For the four bundled plugins, Cera runs `<command> <manifest args> --cat|--find|--grep|--diff <user arguments>`, lets the plugin write directly to standard output, and exits with the plugin's exit code.
 
 ## Installation and activation
+
+On first launch, when `config.json` does not exist yet, Cera creates it with the bundled plugins in `plugins.enabled` and copies them to `~/.config/cera/plugins/` (Nix, `.deb`, `.rpm` packages, `.tar.gz` archive). An existing `config.json` is never modified.
+
+Whenever Cera's version changes, the bundled plugins already present in `~/.config/cera/plugins/` are replaced by the new version (the `.cera-version` file there keeps the installed version). Local changes to a bundled plugin are therefore lost; a plugin you created under another name is never touched.
+
+From source, or after changing a plugin:
 
 ```
 ./plugins/install.sh

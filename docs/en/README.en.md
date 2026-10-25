@@ -1,4 +1,4 @@
-[Français](../README.md) | **English**
+[Français](../../README.md) | **English**
 
 # Cera
 
@@ -6,14 +6,18 @@
 
 Cera is a text editor for the terminal, written in Rust.
 
-## What is Cera?
+<details open>
+<summary><h2>What is Cera?</h2></summary>
 
 Cera is an easy-to-pick-up editor: classic `Ctrl` shortcuts (`Ctrl-S` saves, `Ctrl-Q` quits), mouse support, tabs, and syntax highlighting. It is a more modern and intuitive alternative to classic terminal editors,
 with a plugin system whose plugins can be written in C++, C, Rust, JS or Python.
 
 The full list of features and shortcuts is in the editor: `Ctrl-D`, or `cera --help` for the options.
 
-## Installation
+</details>
+
+<details open>
+<summary><h2>Installation</h2></summary>
 
 ### With Nix
 
@@ -34,7 +38,7 @@ inputs.cera = {
 # in the list of modules:
 { environment.systemPackages = [ inputs.cera.packages.${system}.default ]; }
 ```
-Plugins are installed in `~/.config/cera/plugins` or in `plugins.directory` from `config.json`: see [PLUGINS.en.md](PLUGINS.en.md).
+On first launch, Cera copies the bundled plugins to `~/.config/cera/plugins` and enables them: see [PLUGINS.en.md](PLUGINS.en.md).
 
 ### From source
 
@@ -48,7 +52,18 @@ cargo build --release
 
 The bundled plugins require `python3`.
 
-## Usage
+</details>
+
+<details open>
+<summary><h2>Usage</h2></summary>
+
+### Without plugin
+
+```
+cera [file]
+```
+
+### With plugin
 
 ```
 cera [options] [file ...]
@@ -62,20 +77,30 @@ cera [options] [file ...]
 | `-g`, `--grep pattern [path...]` | Searches for text in files and directories |
 | `-d`, `--diff file1 file2...` | Compares each file to the first one |
 | `-h`, `--help` | Shows the help and the documentation of the active plugins |
+| `-v`, `--version` | Shows the version |
 
 The `-a`, `-f`, `-g` and `-d` options are provided by plugins: they only work if the plugin is enabled.
 
-## Documentation
+</details>
+
+<details open>
+<summary><h2>Documentation</h2></summary>
 
 - **In the editor**: `Ctrl-D` opens the full documentation (shortcuts, active plugins); `Ctrl-H` shows or hides the help bar.
 - **On the command line**: `cera --help`.
 - **Plugins**: [PLUGINS.en.md](PLUGINS.en.md) explains how to use and write them.
 
-## Configuration
+</details>
+
+<details open>
+<summary><h2>Configuration</h2></summary>
 
 On first launch, Cera creates `~/.config/cera/config.json`. This file contains every available key with its default value: tab width, colors, interface language, enabled plugins, mouse, line numbers. Edit it directly; a missing key keeps its default value.
 
-## Translations
+</details>
+
+<details open>
+<summary><h2>Translations</h2></summary>
 
 Cera's interface is available in French, English and Spanish. The language is chosen in this order:
 
@@ -87,7 +112,10 @@ A text that is missing from a translation is shown in English. The description o
 
 To fix a translation or add a language, see "Translations" in [CONTRIBUTING.en.md](CONTRIBUTING.en.md).
 
-## Repository layout
+</details>
+
+<details open>
+<summary><h2>Repository layout</h2></summary>
 
 ```
 src/                  editor source code
@@ -103,11 +131,17 @@ tests/                integration tests and example plugins in 5 languages
 flake.nix             Nix package and development environment
 ```
 
-## Contributing
+</details>
+
+<details open>
+<summary><h2>Contributing</h2></summary>
 
 See [CONTRIBUTING.en.md](CONTRIBUTING.en.md).
 
-## Reporting a problem
+</details>
+
+<details open>
+<summary><h2>Reporting a problem</h2></summary>
 
 First check whether the problem has already been reported in the [issues](https://github.com/kelian-4/cera/issues). Otherwise, open one and include:
 
@@ -116,6 +150,11 @@ First check whether the problem has already been reported in the [issues](https:
 - the relevant contents of your `config.json` and the list of active plugins (`cera --help`);
 - the steps to reproduce the problem.
 
-## License
+</details>
 
-Cera is distributed under the GNU GPL version 3 or later: see [LICENSE](../LICENSE).
+<details open>
+<summary><h2>License</h2></summary>
+
+Cera is distributed under the GNU GPL version 3 or later: see [LICENSE](../../LICENSE).
+
+</details>

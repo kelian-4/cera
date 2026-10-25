@@ -1,4 +1,4 @@
-**Français** | [English](en/README.en.md)
+**Français** | [English](docs/en/README.en.md)
 
 # Cera
 
@@ -8,12 +8,15 @@ Cera est un éditeur de texte pour le terminal, écrit en Rust.
   <img src="docs/cera-demo.gif" alt="Démonstration de Cera" width="100%" />
 </p>
 
-
-## Qu'est-ce que Cera ?
+<details open>
+<summary><h2>Qu'est-ce que Cera ?</h2></summary>
 
 Cera est un éditeur cli simple à prendre en main. Il est pensé comme une alternative plus moderne et plus intuitive aux éditeurs classiques avec un système de plugins pouvant être écrits en C++, C, Rust, JS, Python permettant d'étendre ou de modifier l'éditeur à son bon vouloir sans modifier le code source.
 
-## Images 
+</details>
+
+<details open>
+<summary><h2>Images</h2></summary>
 
 File explorer
 
@@ -28,7 +31,10 @@ et plus
 
 La liste complète des fonctionnalités et des raccourcis est dans l'éditeur : `Ctrl-D`, ou `cera --help` pour les options.
 
-## Installation
+</details>
+
+<details open>
+<summary><h2>Installation</h2></summary>
 
 ### Avec Nix
 
@@ -49,7 +55,7 @@ inputs.cera = {
 # dans la liste des modules :
 { environment.systemPackages = [ inputs.cera.packages.${system}.default ]; }
 ```
-Les plugins sont installés dans `~/.config/cera/plugins` ou dans `plugins.directory` de `config.json` : voir [PLUGINS.md](PLUGINS.md).
+Au premier lancement, Cera copie les plugins fournis dans `~/.config/cera/plugins` et les active : voir [PLUGINS.md](PLUGINS.md).
 
 ### Depuis les sources
 
@@ -63,7 +69,18 @@ cargo build --release
 
 Les plugins fournis demandent `python3`.
 
-## Utilisation
+</details>
+
+<details open>
+<summary><h2>Utilisation</h2></summary>
+
+### Sans plugin
+
+```
+cera [fichier]
+```
+
+### Avec plugin
 
 ```
 cera [options] [fichier ...]
@@ -77,20 +94,30 @@ cera [options] [fichier ...]
 | `-g`, `--grep motif [chemin...]` | Cherche un texte dans des fichiers et dossiers |
 | `-d`, `--diff fichier1 fichier2...` | Compare chaque fichier au premier |
 | `-h`, `--help` | Affiche l'aide et la documentation des plugins actifs |
+| `-v`, `--version` | Affiche la version |
 
 Les options `-a`, `-f`, `-g` et `-d` sont fournies par des plugins : elles ne fonctionnent que si le plugin est activé.
 
-## Documentation
+</details>
+
+<details open>
+<summary><h2>Documentation</h2></summary>
 
 - **Dans l'éditeur** : `Ctrl-D` ouvre la documentation complète (raccourcis, plugins actifs) ; `Ctrl-H` affiche ou masque le bandeau d'aide.
 - **En ligne de commande** : `cera --help`.
 - **Plugins** : [PLUGINS.md](PLUGINS.md) explique comment en utiliser et en écrire.
 
-## Configuration
+</details>
+
+<details open>
+<summary><h2>Configuration</h2></summary>
 
 Au premier lancement, Cera crée `~/.config/cera/config.json`. Ce fichier contient toutes les clés disponibles avec leurs valeurs par défaut : largeur des tabulations, couleurs, langue de l'interface, plugins activés, souris, numéros de ligne. Modifiez-le directement ; une clé absente garde sa valeur par défaut.
 
-## Traductions
+</details>
+
+<details open>
+<summary><h2>Traductions</h2></summary>
 
 L'interface de Cera existe en français, en anglais et en espagnol. La langue est choisie dans cet ordre :
 
@@ -102,7 +129,10 @@ Un texte qui manque dans une traduction s'affiche en anglais. La description des
 
 Pour corriger une traduction ou ajouter une langue, voir « Traductions » dans [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Structure du dépôt
+</details>
+
+<details open>
+<summary><h2>Structure du dépôt</h2></summary>
 
 ```
 src/                  code source de l'éditeur
@@ -118,11 +148,17 @@ tests/                tests d'intégration et plugins d'exemple en 5 langages
 flake.nix             paquet et environnement de développement Nix
 ```
 
-## Contribuer
+</details>
+
+<details open>
+<summary><h2>Contribuer</h2></summary>
 
 Voir [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Signaler un problème
+</details>
+
+<details open>
+<summary><h2>Signaler un problème</h2></summary>
 
 Cherchez d'abord si le problème est déjà signalé dans les [issues](https://github.com/kelian-4/cera/issues). Sinon, ouvrez-en une en indiquant :
 
@@ -131,6 +167,11 @@ Cherchez d'abord si le problème est déjà signalé dans les [issues](https://g
 - le contenu utile de votre `config.json` et la liste des plugins actifs (`cera --help`) ;
 - les étapes pour reproduire le problème.
 
-## Licence
+</details>
+
+<details open>
+<summary><h2>Licence</h2></summary>
 
 Cera est distribué sous licence GNU GPL version 3 ou ultérieure : voir [LICENSE](LICENSE).
+
+</details>

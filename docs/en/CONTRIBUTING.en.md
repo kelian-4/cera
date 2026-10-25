@@ -1,4 +1,4 @@
-[Français](../CONTRIBUTING.md) | **English**
+[Français](../../CONTRIBUTING.md) | **English**
 
 # Contributing to Cera
 
