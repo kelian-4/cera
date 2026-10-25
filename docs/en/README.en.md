@@ -77,7 +77,7 @@ cera [options] [file ...]
 | `-g`, `--grep pattern [path...]` | Searches for text in files and directories |
 | `-d`, `--diff file1 file2...` | Compares each file to the first one |
 | `-h`, `--help` | Shows the help and the documentation of the active plugins |
-| `--version` | Shows the version |
+| `-v`, `--version` | Shows the version |
 
 The `-a`, `-f`, `-g` and `-d` options are provided by plugins: they only work if the plugin is enabled.
 

@@ -94,7 +94,7 @@ cera [options] [fichier ...]
 | `-g`, `--grep motif [chemin...]` | Cherche un texte dans des fichiers et dossiers |
 | `-d`, `--diff fichier1 fichier2...` | Compare chaque fichier au premier |
 | `-h`, `--help` | Affiche l'aide et la documentation des plugins actifs |
-| `--version` | Affiche la version |
+| `-v`, `--version` | Affiche la version |
 
 Les options `-a`, `-f`, `-g` et `-d` sont fournies par des plugins : elles ne fonctionnent que si le plugin est activé.
 

@@ -60,7 +60,7 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<Command, CliError> {
     if option_requested(args, &["-h", "--help"]) {
         return Ok(Command::Help);
     }
-    if option_requested(args, &["--version"]) {
+    if option_requested(args, &["-v", "--version"]) {
         return Ok(Command::Version);
     }
 
@@ -384,6 +384,7 @@ mod tests {
     #[test]
     fn test_version_flag() {
         assert_eq!(p(&["--version"]), Ok(Command::Version));
+        assert_eq!(p(&["-v"]), Ok(Command::Version));
     }
 
     #[test]

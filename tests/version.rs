@@ -29,6 +29,13 @@ fn version_prints_name_and_version() {
 }
 
 #[test]
+fn short_version_prints_name_and_version() {
+    let output = run(&home_for("short"), &["-v"]);
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), expected_output());
+}
+
+#[test]
 fn version_wins_over_other_options() {
     let output = run(&home_for("options"), &["-g", "x", "--version"]);
     assert!(output.status.success());
