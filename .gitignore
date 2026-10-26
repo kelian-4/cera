@@ -2,4 +2,3 @@
 *.pdb
 __pycache__/
 /dist
-ci-status.md
