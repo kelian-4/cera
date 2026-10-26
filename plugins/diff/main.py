@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import difflib
+import re
 import sys
 
 RESET = "\x1b[0m"
@@ -7,6 +8,15 @@ BOLD = "\x1b[1m"
 RED = "\x1b[31m"
 GREEN = "\x1b[32m"
 CYAN = "\x1b[36m"
+
+
+_CONTROL_CHARS = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f]")
+
+
+def clean(text):
+    """Remplace les caracteres de controle (dont ESC) par '?' : un nom de fichier ou un contenu
+    ne doit pas pouvoir envoyer de sequence d'echappement au terminal."""
+    return _CONTROL_CHARS.sub("?", text)
 
 
 def read_lines(path):
@@ -47,7 +57,7 @@ def diff_mode(paths):
             )
         )
         for line in changes:
-            sys.stdout.write(colorize(line) + "\n")
+            sys.stdout.write(colorize(clean(line)) + "\n")
         if changes and exit_code == 0:
             exit_code = 1
     return exit_code

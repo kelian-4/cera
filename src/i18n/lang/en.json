@@ -52,6 +52,8 @@
   "status.save_as_prompt": "Save as: %s (Escape to cancel)",
   "status.save_cancelled": "Save cancelled",
   "status.save_error": "Save error: %s",
+  "status.open_error": "Could not open %s",
+  "status.open_not_utf8": "%s is not a UTF-8 file: not opened, so it cannot be overwritten",
   "status.no_match_found": "No match found",
   "status.goto_prompt": "Go to line,column: %s (Escape to cancel)",
   "status.line_number_required": "Line number required (line or line,column)",

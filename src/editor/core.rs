@@ -113,7 +113,15 @@ impl Editor {
     }
 
     pub fn open_file(&mut self, filename: &str) {
-        self.buffer_manager.open_file(filename, &self.syntax_db);
+        if let Err(error) = self.buffer_manager.open_file(filename, &self.syntax_db) {
+            let message = if error.kind() == std::io::ErrorKind::InvalidData {
+                self.i18n.t1("status.open_not_utf8", filename)
+            } else {
+                self.i18n
+                    .t1("status.open_error", &format!("{} ({})", filename, error))
+            };
+            self.set_status_message_kind(message, MessageKind::Error);
+        }
     }
 
     fn set_status_message(&mut self, msg: impl Into<String>) {
@@ -121,7 +129,7 @@ impl Editor {
     }
 
     fn set_status_message_kind(&mut self, msg: impl Into<String>, kind: MessageKind) {
-        self.status_message = msg.into();
+        self.status_message = crate::view::sanitize::neutralize_controls(&msg.into());
         self.status_message_kind = kind;
         self.status_message_time = std::time::Instant::now();
     }
