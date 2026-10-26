@@ -52,6 +52,8 @@
   "status.save_as_prompt": "Guardar como: %s (Escape para cancelar)",
   "status.save_cancelled": "Guardado cancelado",
   "status.save_error": "Error al guardar: %s",
+  "status.open_error": "No se pudo abrir %s",
+  "status.open_not_utf8": "%s no es un archivo UTF-8: no se abrio para no sobrescribirlo",
   "status.no_match_found": "No se encontro ninguna coincidencia",
   "status.goto_prompt": "Ir a linea,columna: %s (Escape para cancelar)",
   "status.line_number_required": "Numero de linea requerido (linea o linea,columna)",

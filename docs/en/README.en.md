@@ -40,6 +40,18 @@ inputs.cera = {
 ```
 On first launch, Cera copies the bundled plugins to `~/.config/cera/plugins` and enables them: see [PLUGINS.en.md](PLUGINS.en.md).
 
+### From a release (Debian, Ubuntu, Fedora…)
+
+The packages (x86_64 and aarch64) are on the [releases page](https://github.com/kelian-4/cera/releases):
+
+```
+sudo apt install ./cera_0.1.0_amd64.deb         # Debian, Ubuntu
+sudo dnf install ./cera-0.1.0-1.x86_64.rpm      # Fedora
+tar -xzf cera-0.1.0-linux-x86_64.tar.gz         # archive: binary + plugins
+```
+
+Each release also contains a `SHA256SUMS` file to verify the downloads.
+
 ### From source
 
 You only need Rust installed:

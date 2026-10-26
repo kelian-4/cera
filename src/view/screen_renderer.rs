@@ -191,7 +191,9 @@ fn draw_tab_bar(ab: &mut AppendBuffer, state: &ViewState) {
     let mut line = String::new();
     for i in 0..state.buffer_manager.count() {
         let ob = state.buffer_manager.at(i);
-        let mut name = ob.buffer.filename().unwrap_or("[Sans nom]").to_string();
+        let mut name = crate::view::sanitize::neutralize_controls(
+            ob.buffer.filename().unwrap_or("[Sans nom]"),
+        );
         if let Some(pos) = name.rfind('/') {
             name = name[pos + 1..].to_string();
         }
@@ -349,8 +351,13 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
 
                 let ch = render_chars.get(ci).copied().unwrap_or(' ');
 
-                if (ch as u32) < 32 && ch != '\0' {
-                    let sym = char::from_u32('@' as u32 + ch as u32).unwrap_or('?');
+                if ch != '\0' && ch.is_control() {
+                    let code = ch as u32;
+                    let sym = if code < 32 {
+                        char::from_u32('@' as u32 + code).unwrap_or('?')
+                    } else {
+                        '?'
+                    };
                     ab.append("\x1b[7m");
                     ab.append(&sym.to_string());
                     ab.append("\x1b[m");
@@ -605,7 +612,8 @@ fn draw_status_bar(ab: &mut AppendBuffer, state: &ViewState) {
     };
 
     let no_name = state.i18n.t("doc.no_filename");
-    let mut filename = buffer.filename().unwrap_or(&no_name).to_string();
+    let mut filename =
+        crate::view::sanitize::neutralize_controls(buffer.filename().unwrap_or(&no_name));
     if let Some(pos) = filename.rfind('/') {
         filename = filename[pos + 1..].to_string();
     }

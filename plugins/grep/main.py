@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 import os
+import re
 import sys
+
+_CONTROL_CHARS = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f]")
+
+
+def clean(text):
+    """Remplace les caracteres de controle (dont ESC) par '?' : un nom de fichier ou un contenu
+    ne doit pas pouvoir envoyer de sequence d'echappement au terminal."""
+    return _CONTROL_CHARS.sub("?", text)
+
+
+def printable(text):
+    return clean(text) if sys.stdout.isatty() else text
 
 
 def is_binary(path):
@@ -14,7 +27,7 @@ def grep_file(path, pattern):
         for number, line in enumerate(f, 1):
             if pattern in line:
                 text = line.rstrip("\r\n")
-                sys.stdout.write(f"{path}:{number}:{text}\n")
+                sys.stdout.write(printable(f"{path}:{number}:{text}") + "\n")
                 found = True
     return found
 

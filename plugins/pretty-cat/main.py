@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 import sys
+_CONTROL_CHARS = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f]")
+def clean(text):
+    # ESC et autres caracteres de controle -> "?", pour ne rien envoyer d'interpretable au terminal
+    return _CONTROL_CHARS.sub("?", text)
 LANGUAGES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "languages.json")
 COLORS = {
     "normal": "#E8EDF2",
@@ -870,7 +875,7 @@ def cat_mode(paths):
             sys.stdout.write(ANSI_RESET)
             for segment in line_segments:
                 sys.stdout.write(ansi_fg(segment["color"], segment.get("bold", False)))
-                sys.stdout.write(segment["text"])
+                sys.stdout.write(clean(segment["text"]))
                 sys.stdout.write(ANSI_RESET)
             sys.stdout.write("\n")
     return exit_code

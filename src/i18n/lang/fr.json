@@ -52,6 +52,8 @@
   "status.save_as_prompt": "Sauvegarder sous : %s (Echap pour annuler)",
   "status.save_cancelled": "Sauvegarde annulee",
   "status.save_error": "Erreur de sauvegarde : %s",
+  "status.open_error": "Impossible d'ouvrir %s",
+  "status.open_not_utf8": "%s n'est pas un fichier UTF-8 : ouverture refusee pour ne pas l'ecraser",
   "status.no_match_found": "Aucune occurrence trouvee",
   "status.goto_prompt": "Aller a ligne,colonne: %s (Echap pour annuler)",
   "status.line_number_required": "Numero de ligne requis (ligne ou ligne,colonne)",
