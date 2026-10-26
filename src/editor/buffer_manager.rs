@@ -86,10 +86,10 @@ impl BufferManager {
         })
     }
 
-    pub fn open_file(&mut self, filename: &str, syntax_db: &[Syntax]) -> usize {
+    pub fn open_file(&mut self, filename: &str, syntax_db: &[Syntax]) -> std::io::Result<usize> {
         if let Some(existing_idx) = self.find_open_buffer(filename) {
             self.active_index = existing_idx;
-            return existing_idx;
+            return Ok(existing_idx);
         }
 
         let reuse_first = self.buffers.len() == 1
@@ -103,7 +103,12 @@ impl BufferManager {
             self.buffers.len() - 1
         };
 
-        file_io::open_file(&mut self.buffers[idx].buffer, filename);
+        if let Err(error) = file_io::open_file(&mut self.buffers[idx].buffer, filename) {
+            if !reuse_first {
+                self.buffers.pop();
+            }
+            return Err(error);
+        }
         let syntax_idx = syntax_db
             .iter()
             .position(|s| crate::syntax::matches(s, filename));
@@ -118,7 +123,7 @@ impl BufferManager {
         }
 
         self.active_index = idx;
-        idx
+        Ok(idx)
     }
 
     pub fn close_active(&mut self) {
@@ -179,12 +184,12 @@ mod tests {
         let mut mgr = BufferManager::new();
         assert_eq!(mgr.count(), 1);
 
-        mgr.open_file(path1, &db);
+        mgr.open_file(path1, &db).unwrap();
         assert_eq!(mgr.count(), 1);
         assert_eq!(mgr.active().buffer.filename(), Some(path1));
         assert!(mgr.active().active_syntax_idx.is_some());
 
-        mgr.open_file(path2, &db);
+        mgr.open_file(path2, &db).unwrap();
         assert_eq!(mgr.count(), 2);
         assert_eq!(mgr.active_index(), 1);
 
@@ -204,6 +209,29 @@ mod tests {
     }
 
     #[test]
+    fn test_open_unreadable_file_leaves_no_buffer_behind() {
+        let path1 = "/tmp/cera_rust_bm_test_ok.c";
+        let bad = "/tmp/cera_rust_bm_test_latin1.txt";
+        std::fs::write(path1, "int a;\n").unwrap();
+        std::fs::write(bad, b"caf\xe9\n").unwrap();
+
+        let db = crate::syntax::build_database();
+        let mut mgr = BufferManager::new();
+
+        assert!(mgr.open_file(bad, &db).is_err());
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.active().buffer.filename(), None);
+
+        mgr.open_file(path1, &db).unwrap();
+        assert!(mgr.open_file(bad, &db).is_err());
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.active().buffer.filename(), Some(path1));
+
+        let _ = std::fs::remove_file(path1);
+        let _ = std::fs::remove_file(bad);
+    }
+
+    #[test]
     fn test_open_file_reuses_existing_buffer_instead_of_duplicating() {
         let path1 = "/tmp/cera_rust_bm_test_dup1.c";
         let path2 = "/tmp/cera_rust_bm_test_dup2.c";
@@ -213,11 +241,11 @@ mod tests {
         let db = crate::syntax::build_database();
         let mut mgr = BufferManager::new();
 
-        mgr.open_file(path1, &db);
-        mgr.open_file(path2, &db);
+        mgr.open_file(path1, &db).unwrap();
+        mgr.open_file(path2, &db).unwrap();
         assert_eq!(mgr.count(), 2);
 
-        mgr.open_file(path1, &db);
+        mgr.open_file(path1, &db).unwrap();
         assert_eq!(
             mgr.count(),
             2,
@@ -226,8 +254,8 @@ mod tests {
         assert_eq!(mgr.active_index(), 0);
         assert_eq!(mgr.active().buffer.filename(), Some(path1));
 
-        mgr.open_file(path1, &db);
-        mgr.open_file(path1, &db);
+        mgr.open_file(path1, &db).unwrap();
+        mgr.open_file(path1, &db).unwrap();
         assert_eq!(
             mgr.count(),
             2,

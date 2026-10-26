@@ -1,4 +1,5 @@
 use crate::io::json;
+use crate::view::sanitize::neutralize_controls;
 
 pub fn json_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
@@ -144,7 +145,7 @@ pub fn parse_incoming(line: &str) -> Option<IncomingMessage> {
                 for seg_val in &segments_val {
                     let text = seg_val
                         .get("text")
-                        .map(|v| v.as_string(""))
+                        .map(|v| neutralize_controls(&v.as_string("")))
                         .unwrap_or_default();
                     let color = seg_val
                         .get("color")
@@ -175,7 +176,7 @@ pub fn parse_incoming(line: &str) -> Option<IncomingMessage> {
         "status" => {
             let message = value
                 .get("message")
-                .map(|v| v.as_string(""))
+                .map(|v| neutralize_controls(&v.as_string("")))
                 .unwrap_or_default();
             let kind = value
                 .get("kind")
@@ -194,6 +195,36 @@ pub fn parse_incoming(line: &str) -> Option<IncomingMessage> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_incoming_text_cannot_carry_terminal_escape_sequences() {
+        let line =
+            r##"{"type":"render","lines":[{"segments":[{"text":"x\u001b]0;TITRE\u0007.txt"}]}]}"##;
+        let IncomingMessage::Render { lines, .. } = parse_incoming(line).unwrap() else {
+            panic!("message render attendu");
+        };
+        assert_eq!(lines[0].segments[0].text, "x?]0;TITRE?.txt");
+
+        let status = r##"{"type":"status","message":"a\u001b[2Jb","kind":"error"}"##;
+        assert_eq!(
+            parse_incoming(status).unwrap(),
+            IncomingMessage::Status {
+                message: "a?[2Jb".to_string(),
+                is_error: true
+            }
+        );
+    }
+
+    #[test]
+    fn test_open_file_path_is_not_altered() {
+        let line = r##"{"type":"open_file","path":"/tmp/a\u001bb"}"##;
+        assert_eq!(
+            parse_incoming(line).unwrap(),
+            IncomingMessage::OpenFile {
+                path: "/tmp/a\u{1b}b".to_string()
+            }
+        );
+    }
 
     #[test]
     fn test_json_escape_handles_quotes_and_backslashes() {

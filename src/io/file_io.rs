@@ -3,16 +3,24 @@ use std::io;
 
 use crate::model::buffer::Buffer;
 
-pub fn open_file(buffer: &mut Buffer, filename: &str) {
-    buffer.set_filename(filename);
-
+/// Ouvre `filename` dans `buffer`.
+///
+/// Un fichier qui n'existe pas encore donne un buffer vide portant ce nom (nouveau fichier).
+/// Toute autre erreur (fichier non UTF-8, droits insuffisants, dossier...) est renvoyee et le
+/// buffer n'est pas modifie : il ne porte pas le nom du fichier, donc une sauvegarde ne peut pas
+/// ecraser le fichier d'origine avec un contenu vide.
+pub fn open_file(buffer: &mut Buffer, filename: &str) -> io::Result<()> {
     let content = match fs::read_to_string(filename) {
         Ok(c) => c,
-        Err(_) => {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            buffer.set_filename(filename);
             buffer.set_lines(&[]);
-            return;
+            return Ok(());
         }
+        Err(e) => return Err(e),
     };
+
+    buffer.set_filename(filename);
 
     let lines: Vec<String> = content
         .split('\n')
@@ -30,6 +38,7 @@ pub fn open_file(buffer: &mut Buffer, filename: &str) {
     };
 
     buffer.set_lines(&lines);
+    Ok(())
 }
 
 pub fn save_file(buffer: &mut Buffer) -> io::Result<()> {
@@ -57,7 +66,7 @@ mod tests {
         writeln!(f, "line2").unwrap();
 
         let mut buf = Buffer::new();
-        open_file(&mut buf, path);
+        open_file(&mut buf, path).unwrap();
 
         assert_eq!(buf.num_rows(), 2);
         assert_eq!(buf.row(0).chars(), "line1");
@@ -70,7 +79,7 @@ mod tests {
     #[test]
     fn test_open_nonexistent_file_creates_empty_buffer() {
         let mut buf = Buffer::new();
-        open_file(&mut buf, "/tmp/cera_rust_definitely_does_not_exist.txt");
+        open_file(&mut buf, "/tmp/cera_rust_definitely_does_not_exist.txt").unwrap();
 
         assert_eq!(buf.num_rows(), 1);
         assert_eq!(buf.row(0).chars(), "");
@@ -79,6 +88,30 @@ mod tests {
             buf.filename(),
             Some("/tmp/cera_rust_definitely_does_not_exist.txt")
         );
+    }
+
+    #[test]
+    fn test_open_non_utf8_file_is_refused_and_not_overwritten() {
+        let path = "/tmp/cera_rust_test_open_latin1.txt";
+        fs::write(path, b"caf\xe9 important\n").unwrap();
+
+        let mut buf = Buffer::new();
+        let error = open_file(&mut buf, path).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(buf.filename(), None);
+        assert!(!buf.dirty());
+
+        assert!(save_file(&mut buf).is_err());
+        assert_eq!(fs::read(path).unwrap(), b"caf\xe9 important\n");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_open_directory_is_refused() {
+        let mut buf = Buffer::new();
+        assert!(open_file(&mut buf, "/tmp").is_err());
+        assert_eq!(buf.filename(), None);
     }
 
     #[test]
