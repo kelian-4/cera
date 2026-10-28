@@ -1,7 +1,8 @@
 use crate::model::buffer::Buffer;
 
 const SCAN_ROWS: usize = 1000;
-const BLANK_LOOKAROUND: usize = 200;
+const LOOKAROUND: usize = 500;
+const MAX_BLOCK_SCAN: usize = 2000;
 
 fn default_unit(filetype: &str) -> usize {
     match filetype {
@@ -24,51 +25,74 @@ fn leading_spaces(render: &str) -> Option<usize> {
     None
 }
 
-/// Width (in render columns) of the leading whitespace of a row,
-/// or `None` if the row is empty or only whitespace.
-pub fn row_indent(buffer: &Buffer, idx: usize) -> Option<usize> {
+/// True when the row starts inside a multi-line comment or string, as
+/// computed by the syntax engine. Such rows carry free-form text whose
+/// indentation says nothing about code structure.
+fn starts_in_literal(buffer: &Buffer, idx: usize) -> bool {
+    if idx == 0 {
+        return false;
+    }
+    let s = buffer.row(idx - 1).hl_state;
+    s.inner_comment || s.inner_string != 0 || s.comment || (s.string != 0 && s.embed == 0)
+}
+
+/// Indent (in render columns) of a row as far as code structure is concerned.
+/// Rows inside a multi-line comment or string inherit the indent of the row
+/// where the comment or string started. `None` for blank rows outside of them.
+fn structural_indent(buffer: &Buffer, idx: usize) -> Option<usize> {
+    if starts_in_literal(buffer, idx) {
+        let mut j = idx - 1;
+        let floor = idx.saturating_sub(LOOKAROUND);
+        while j > floor && starts_in_literal(buffer, j) {
+            j -= 1;
+        }
+        return Some(leading_spaces(buffer.row(j).render()).unwrap_or(0));
+    }
     leading_spaces(buffer.row(idx).render())
 }
 
-/// Indent used to draw guides on a row. Blank rows take the smaller indent
-/// of the nearest non-blank rows above and below, so guides stay continuous.
+/// Whether the row has code structure (is not blank and not free-form text).
+pub fn row_has_indent(buffer: &Buffer, idx: usize) -> bool {
+    structural_indent(buffer, idx).is_some()
+}
+
+/// Indent used to draw guides on a row. A blank row takes the indent of the
+/// next non-blank row, so guides stay continuous right after a block header
+/// and stop where the block ends. Blank rows at the edges have no guides.
 pub fn effective_indent(buffer: &Buffer, idx: usize) -> usize {
-    if let Some(w) = row_indent(buffer, idx) {
+    if let Some(w) = structural_indent(buffer, idx) {
         return w;
     }
-    let mut above = 0usize;
-    for i in (idx.saturating_sub(BLANK_LOOKAROUND)..idx).rev() {
-        if let Some(w) = row_indent(buffer, i) {
-            above = w;
-            break;
-        }
+    let start = idx.saturating_sub(LOOKAROUND);
+    let has_prev = (start..idx).any(|i| structural_indent(buffer, i).is_some());
+    if !has_prev {
+        return 0;
     }
-    let mut below = 0usize;
-    let end = (idx + 1 + BLANK_LOOKAROUND).min(buffer.num_rows());
-    for i in idx + 1..end {
-        if let Some(w) = row_indent(buffer, i) {
-            below = w;
-            break;
-        }
-    }
-    above.min(below)
+    let end = (idx + 1 + LOOKAROUND).min(buffer.num_rows());
+    (idx + 1..end)
+        .find_map(|i| structural_indent(buffer, i))
+        .unwrap_or(0)
 }
 
 /// Detects the indentation unit (in render columns) used by the buffer:
 /// one tab stop for tab-indented files, otherwise the most common indent
-/// step between consecutive lines, falling back to the language's usual width.
+/// step between consecutive code lines, falling back to the language's
+/// usual width when the file has no indented code yet.
 pub fn detect_unit(buffer: &Buffer, filetype: &str, tab_stop: usize) -> usize {
     let mut tab_rows = 0usize;
     let mut space_rows = 0usize;
     let mut hist = [0usize; 9];
     let mut prev: Option<usize> = None;
 
-    for row in buffer.rows().iter().take(SCAN_ROWS) {
-        let chars = row.chars();
+    for idx in 0..buffer.num_rows().min(SCAN_ROWS) {
+        if starts_in_literal(buffer, idx) {
+            continue;
+        }
+        let row = buffer.row(idx);
         let Some(w) = leading_spaces(row.render()) else {
             continue;
         };
-        if chars.starts_with('\t') {
+        if row.chars().starts_with('\t') {
             tab_rows += 1;
             prev = Some(w);
             continue;
@@ -77,11 +101,8 @@ pub fn detect_unit(buffer: &Buffer, filetype: &str, tab_stop: usize) -> usize {
             space_rows += 1;
         }
         if let Some(p) = prev {
-            if w > p {
-                let delta = w - p;
-                if (2..=8).contains(&delta) {
-                    hist[delta] += 1;
-                }
+            if w > p && (2..=8).contains(&(w - p)) {
+                hist[w - p] += 1;
             }
         }
         prev = Some(w);
@@ -112,15 +133,93 @@ pub fn is_guide_col(col: usize, indent: usize, unit: usize) -> bool {
     unit > 0 && col.is_multiple_of(unit) && col + unit <= indent
 }
 
+/// The guide of the block that contains the cursor, highlighted as a whole.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ActiveGuide {
+    pub col: usize,
+    pub start: usize,
+    pub end: usize,
+}
+
+impl ActiveGuide {
+    pub fn covers(&self, col: usize, row: usize) -> bool {
+        col == self.col && row >= self.start && row <= self.end
+    }
+}
+
+fn next_structural_indent(buffer: &Buffer, idx: usize) -> Option<usize> {
+    let end = (idx + 1 + LOOKAROUND).min(buffer.num_rows());
+    (idx + 1..end).find_map(|i| structural_indent(buffer, i))
+}
+
+/// Finds the block the cursor is in. On a block header (a line followed by
+/// more deeply indented lines) it is the block the header opens; elsewhere it
+/// is the innermost block around the line. The block spans every consecutive
+/// row, blank rows included, that is indented past the guide.
+pub fn active_guide(buffer: &Buffer, cursor_row: usize, unit: usize) -> Option<ActiveGuide> {
+    if unit == 0 || cursor_row >= buffer.num_rows() {
+        return None;
+    }
+    let w = effective_indent(buffer, cursor_row);
+    let is_code = row_has_indent(buffer, cursor_row);
+    let header_col = w - w % unit;
+    let is_header = is_code
+        && next_structural_indent(buffer, cursor_row).is_some_and(|next| next >= header_col + unit);
+
+    let col = if is_header {
+        header_col
+    } else if w >= unit {
+        (w / unit - 1) * unit
+    } else {
+        return None;
+    };
+    let threshold = col + unit;
+
+    let mut start = if is_header {
+        cursor_row + 1
+    } else {
+        cursor_row
+    };
+    if !is_header {
+        while start > 0
+            && cursor_row - start < MAX_BLOCK_SCAN
+            && effective_indent(buffer, start - 1) >= threshold
+        {
+            start -= 1;
+        }
+    }
+    let mut end = cursor_row;
+    while end + 1 < buffer.num_rows()
+        && end - cursor_row < MAX_BLOCK_SCAN
+        && effective_indent(buffer, end + 1) >= threshold
+    {
+        end += 1;
+    }
+    if start > end {
+        return None;
+    }
+    Some(ActiveGuide { col, start, end })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::row::HlState;
 
     fn buf(lines: &[&str]) -> Buffer {
         let mut b = Buffer::new();
         let v: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
         b.set_lines(&v);
         b
+    }
+
+    fn mark_comment(b: &mut Buffer, rows: &[usize]) {
+        for &r in rows {
+            b.row_mut(r).hl_state = HlState {
+                comment: true,
+                ..HlState::default()
+            };
+        }
     }
 
     #[test]
@@ -149,15 +248,16 @@ mod tests {
     }
 
     #[test]
-    fn ignores_single_space_comment_continuations() {
-        let b = buf(&[
+    fn comment_text_does_not_skew_detection() {
+        let mut b = buf(&[
             "int f() {",
             "    /*",
-            "     * text",
+            "          deeply indented prose",
             "     */",
             "    return 0;",
             "}",
         ]);
+        mark_comment(&mut b, &[1, 2]);
         assert_eq!(detect_unit(&b, "c", 8), 4);
     }
 
@@ -171,14 +271,99 @@ mod tests {
     }
 
     #[test]
-    fn blank_rows_use_smaller_neighbor_indent() {
+    fn blank_row_after_header_keeps_the_guide() {
+        let b = buf(&["fn a() {", "", "    x();", "}"]);
+        assert_eq!(effective_indent(&b, 1), 4);
+    }
+
+    #[test]
+    fn blank_row_at_block_end_drops_to_next_indent() {
         let b = buf(&["fn a() {", "        x();", "", "    y();", "}"]);
         assert_eq!(effective_indent(&b, 2), 4);
     }
 
     #[test]
     fn blank_rows_at_edges_have_no_guides() {
-        let b = buf(&["", "    x();"]);
+        let b = buf(&["", "    x();", "", ""]);
         assert_eq!(effective_indent(&b, 0), 0);
+        assert_eq!(effective_indent(&b, 2), 0);
+        assert_eq!(effective_indent(&b, 3), 0);
+    }
+
+    #[test]
+    fn comment_continuation_rows_inherit_opener_indent() {
+        let mut b = buf(&["fn a() {", "    /*", " * text", "    */", "    x();", "}"]);
+        mark_comment(&mut b, &[1, 2]);
+        assert_eq!(effective_indent(&b, 2), 4);
+        assert!(row_has_indent(&b, 2));
+    }
+
+    #[test]
+    fn active_guide_on_header_is_the_block_it_opens() {
+        let b = buf(&["fn a() {", "    x();", "    y();", "}", "z();"]);
+        let g = active_guide(&b, 0, 4).unwrap();
+        assert_eq!(
+            g,
+            ActiveGuide {
+                col: 0,
+                start: 1,
+                end: 2
+            }
+        );
+    }
+
+    #[test]
+    fn active_guide_in_body_is_the_innermost_block() {
+        let b = buf(&[
+            "fn a() {",
+            "    if x {",
+            "        y();",
+            "        z();",
+            "    }",
+            "}",
+        ]);
+        let g = active_guide(&b, 3, 4).unwrap();
+        assert_eq!(
+            g,
+            ActiveGuide {
+                col: 4,
+                start: 2,
+                end: 3
+            }
+        );
+        let g = active_guide(&b, 2, 4).unwrap();
+        assert_eq!(g.col, 4);
+    }
+
+    #[test]
+    fn active_guide_spans_blank_rows() {
+        let b = buf(&["fn a() {", "    x();", "", "    y();", "}"]);
+        let g = active_guide(&b, 1, 4).unwrap();
+        assert_eq!(
+            g,
+            ActiveGuide {
+                col: 0,
+                start: 1,
+                end: 3
+            }
+        );
+    }
+
+    #[test]
+    fn no_active_guide_at_top_level() {
+        let b = buf(&["a();", "b();"]);
+        assert_eq!(active_guide(&b, 0, 4), None);
+    }
+
+    #[test]
+    fn active_guide_covers_only_its_column_and_rows() {
+        let g = ActiveGuide {
+            col: 4,
+            start: 2,
+            end: 3,
+        };
+        assert!(g.covers(4, 2));
+        assert!(!g.covers(0, 2));
+        assert!(!g.covers(4, 4));
     }
 }

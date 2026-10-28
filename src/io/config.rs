@@ -22,6 +22,8 @@ pub struct ThemeColors {
     pub error_fg: u32,
     pub success_fg: u32,
     pub selection_bg: u32,
+    pub indent_guide: u32,
+    pub indent_guide_active: u32,
 }
 
 impl Default for ThemeColors {
@@ -45,6 +47,8 @@ impl Default for ThemeColors {
             error_fg: 0xFF8A8A,
             success_fg: 0x9CE89C,
             selection_bg: 0x3A4A5A,
+            indent_guide: 0x3F4E63,
+            indent_guide_active: 0x7BA3C9,
         }
     }
 }
@@ -145,6 +149,8 @@ fn default_config_json() -> String {
     "escape": "#FFB86B",
     "match": "#FFFF66",
     "line_number_fg": "#7BA3C9",
+    "indent_guide": "#3F4E63",
+    "indent_guide_active": "#7BA3C9",
     "error_fg": "#FF8A8A",
     "success_fg": "#9CE89C"
   }
@@ -273,6 +279,12 @@ pub fn load_from_file(path: &str) -> (Config, bool) {
             apply_theme_field(theme, "escape", &mut cfg.theme.escape);
             apply_theme_field(theme, "match", &mut cfg.theme.match_color);
             apply_theme_field(theme, "line_number_fg", &mut cfg.theme.line_number_fg);
+            apply_theme_field(theme, "indent_guide", &mut cfg.theme.indent_guide);
+            apply_theme_field(
+                theme,
+                "indent_guide_active",
+                &mut cfg.theme.indent_guide_active,
+            );
             apply_theme_field(theme, "error_fg", &mut cfg.theme.error_fg);
             apply_theme_field(theme, "success_fg", &mut cfg.theme.success_fg);
         }

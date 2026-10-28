@@ -291,6 +291,18 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
     } else {
         0
     };
+    let active_guide = if guide_unit > 0 {
+        crate::view::indent_guides::active_guide(buffer, ob.cursor.cy, guide_unit)
+    } else {
+        None
+    };
+    let guide_rgb = |col: usize, row: usize| {
+        if active_guide.is_some_and(|g| g.covers(col, row)) {
+            theme.indent_guide_active
+        } else {
+            theme.indent_guide
+        }
+    };
 
     for y in 0..text_rows {
         let filerow = y + state.rowoff;
@@ -330,7 +342,7 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
             let (guide_indent, row_is_blank) = if guide_unit > 0 {
                 (
                     crate::view::indent_guides::effective_indent(buffer, filerow),
-                    crate::view::indent_guides::row_indent(buffer, filerow).is_none(),
+                    !crate::view::indent_guides::row_has_indent(buffer, filerow),
                 )
             } else {
                 (0, false)
@@ -387,8 +399,9 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
                 } else if ch == ' '
                     && crate::view::indent_guides::is_guide_col(ci, guide_indent, guide_unit)
                 {
-                    current_color_rgb = Some(theme.line_number_fg);
-                    ab.append(&fg_sequence(theme.line_number_fg, true_color));
+                    let rgb = guide_rgb(ci, filerow);
+                    current_color_rgb = Some(rgb);
+                    ab.append(&fg_sequence(rgb, true_color));
                     ab.append("│");
                 } else {
                     let h = hl
@@ -412,7 +425,7 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
                     if ci >= state.coloff
                         && crate::view::indent_guides::is_guide_col(ci, guide_indent, guide_unit)
                     {
-                        ab.append(&fg_sequence(theme.line_number_fg, true_color));
+                        ab.append(&fg_sequence(guide_rgb(ci, filerow), true_color));
                         ab.append("│");
                     } else if ci >= state.coloff {
                         ab.append(" ");
