@@ -1,9 +1,9 @@
 # CI Status
 
-Commit: 44eff3d18aab2ffb9b118500e02d0dc39b0c5e32
+Commit: 19e6ba8df33a1492cb1ab9a075f13893cbf0ef23
 Branche: dev
-Date: 2026-10-26 09:35:10 UTC
-Run: https://github.com/kelian-4/cera/actions/runs/40300568230
+Date: 2026-10-28 09:32:47 UTC
+Run: https://github.com/kelian-4/cera/actions/runs/40664936930
 
 | Etape | Resultat |
 |---|---|
@@ -19,7 +19,7 @@ Run: https://github.com/kelian-4/cera/actions/runs/40300568230
 ## Log complet - Clippy
 ```
 [1m[92m    Checking[0m cera v0.1.0 (/home/runner/work/cera/cera)
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.79s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.01s
 ```
 
 ## Log complet - Build
@@ -28,111 +28,110 @@ Run: https://github.com/kelian-4/cera/actions/runs/40300568230
 [1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m cfg-if v1.0.4
 [1m[92m       Fresh[0m nix v0.27.1
-[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/syntax/toml_syntax.rs` has changed (1793007254.585853058s, 30h 19m 41s after last build at 1792898073.326929534s)
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/editor/core.rs` has changed (1793179910.244142558s, 78h 17m 17s after last build at 1792898073.326929534s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=789b2fb61ad4a37f -C extra-filename=-2b70397db7a339b1 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rmeta --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rmeta --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rmeta`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=212ac5ff117fb7ae -C extra-filename=-d0ba6b0fc148147d --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.02s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.25s
 ```
 
 ## Log complet - Tests
 ```
 [1m[92m       Fresh[0m libc v0.2.189
-[1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m cfg-if v1.0.4
+[1m[92m       Fresh[0m bitflags v2.13.2
 [1m[92m       Fresh[0m nix v0.27.1
-[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/syntax/xml_syntax.rs` has changed (1793007254.585853058s, 30h 19m 40s after last build at 1792898074.548544821s)
+[1m[92m       Dirty[0m cera v0.1.0 (/home/runner/work/cera/cera): the file `src/view/help_text.rs` has changed (1793179910.248934191s, 78h 17m 16s after last build at 1792898074.548544821s)
 [1m[92m   Compiling[0m cera v0.1.0 (/home/runner/work/cera/cera)
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ebe8ffbcfca6fd5a -C extra-filename=-8baea2e795c850cf --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
+[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name plugin_languages --edition=2021 tests/plugin_languages.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7249014d0a5fe652 -C extra-filename=-b4dae101d3ea0655 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name version --edition=2021 tests/version.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=1d4f3664bd20b2b8 -C extra-filename=-16fefda16938d94d --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name bundled_plugins --edition=2021 tests/bundled_plugins.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=cfd67f1e3e2ae4bd -C extra-filename=-f5741d0d8772507a --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=81c1988cab904c4a -C extra-filename=-db7687ae4651fef9 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name arrow_down --edition=2021 tests/arrow_down.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=9546585211e9a5bf -C extra-filename=-17121a83f103d1c3 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name paste --edition=2021 tests/paste.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ee24e6cac58fb3f1 -C extra-filename=-dc502ba479745c0a --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name escape_key --edition=2021 tests/escape_key.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=091ce9a0c3660142 -C extra-filename=-3e07fb81419e900d --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name plugin_languages --edition=2021 tests/plugin_languages.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7249014d0a5fe652 -C extra-filename=-b4dae101d3ea0655 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
+[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name paste --edition=2021 tests/paste.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ee24e6cac58fb3f1 -C extra-filename=-dc502ba479745c0a --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
+[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name arrow_down --edition=2021 tests/arrow_down.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=9546585211e9a5bf -C extra-filename=-17121a83f103d1c3 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
 [1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name pretty_cat_languages --edition=2021 tests/pretty_cat_languages.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=02fad8208b3ce53e -C extra-filename=-01f818e69756a6f1 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
-[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 1.50s
+[1m[92m     Running[0m `/home/runner/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name cera --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=81c1988cab904c4a -C extra-filename=-db7687ae4651fef9 --out-dir /home/runner/work/cera/cera/target/debug/deps -L dependency=/home/runner/work/cera/cera/target/debug/deps --extern bitflags=/home/runner/work/cera/cera/target/debug/deps/libbitflags-86956476ac6de8d5.rlib --extern cera=/home/runner/work/cera/cera/target/debug/deps/libcera-2b70397db7a339b1.rlib --extern libc=/home/runner/work/cera/cera/target/debug/deps/liblibc-225b59a4e9bd79b1.rlib --extern nix=/home/runner/work/cera/cera/target/debug/deps/libnix-671e6b86e316e608.rlib`
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 2.06s
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-8baea2e795c850cf`
 
-running 179 tests
+running 187 tests
 test cli::tests::test_diff_requires_two_files ... ok
 test cli::tests::test_diff_takes_two_or_more_files ... ok
 test cli::tests::test_double_dash_ends_options ... ok
 test cli::tests::test_explorer_dir_can_come_before_the_flag ... ok
-test cli::tests::test_explorer_with_dir ... ok
-test cli::tests::test_find_requires_exactly_one_name ... ok
-test cli::tests::test_explorer_with_dir_and_extra_files ... ok
 test cli::tests::test_explorer_without_dir_uses_current_directory ... ok
-test cli::tests::test_grep_pattern_starting_with_dash_needs_double_dash ... ok
+test cli::tests::test_explorer_with_dir ... ok
+test cli::tests::test_explorer_with_dir_and_extra_files ... ok
+test cli::tests::test_find_requires_exactly_one_name ... ok
+test cli::tests::test_find_takes_one_name ... ok
 test cli::tests::test_grep_requires_a_pattern ... ok
 test cli::tests::test_grep_takes_pattern_then_paths ... ok
-test cli::tests::test_grep_takes_pattern_without_paths ... ok
 test cli::tests::test_help_after_double_dash_is_a_plain_argument ... ok
+test cli::tests::test_help_flags ... ok
+test cli::tests::test_grep_pattern_starting_with_dash_needs_double_dash ... ok
+test cli::tests::test_grep_takes_pattern_without_paths ... ok
 test cli::tests::test_help_takes_priority_over_other_arguments ... ok
 test cli::tests::test_help_takes_priority_over_version ... ok
-test cli::tests::test_help_flags ... ok
-test cli::tests::test_find_takes_one_name ... ok
 test cli::tests::test_modes_are_mutually_exclusive ... ok
 test cli::tests::test_no_args_opens_editor_without_files ... ok
-test cli::tests::test_show_collects_all_files ... ok
 test cli::tests::test_plain_files_open_in_editor ... ok
 test cli::tests::test_show_and_explorer_together_is_an_error ... ok
+test cli::tests::test_show_collects_all_files ... ok
 test cli::tests::test_show_without_file_is_an_error ... ok
 test cli::tests::test_single_dash_is_a_filename_not_an_option ... ok
-test cli::tests::test_unknown_option_is_an_error ... ok
 test cli::tests::test_version_after_double_dash_is_a_plain_argument ... ok
 test cli::tests::test_version_flag ... ok
+test cli::tests::test_unknown_option_is_an_error ... ok
 test cli::tests::test_version_takes_priority_over_other_arguments ... ok
 test editor::buffer_manager::tests::test_multiple_buffers ... ok
-test editor::buffer_manager::tests::test_open_file_reuses_existing_buffer_instead_of_duplicating ... ok
 test editor::buffer_manager::tests::test_open_unreadable_file_leaves_no_buffer_behind ... ok
+test editor::buffer_manager::tests::test_open_file_reuses_existing_buffer_instead_of_duplicating ... ok
 test editor::core::paste_text_tests::test_normalize_drops_control_characters_that_could_trigger_commands ... ok
-test editor::core::paste_text_tests::test_normalize_keeps_tabs_and_unicode ... ok
 test editor::core::paste_text_tests::test_single_line_paste_drops_control_characters ... ok
+test editor::core::paste_text_tests::test_normalize_keeps_tabs_and_unicode ... ok
 test editor::core::paste_text_tests::test_normalize_unifies_every_kind_of_line_ending ... ok
-test editor::undo_stack::tests::test_coalescing ... ok
 test editor::core::paste_text_tests::test_single_line_paste_stops_at_the_first_line_break ... ok
+test editor::undo_stack::tests::test_coalescing ... ok
 test editor::undo_stack::tests::test_coalescing_breaks_on_word_boundary ... ok
-test i18n::tests::test_detect_system_language_parses_locale_format ... ok
-test i18n::tests::test_load_explicit_language ... ok
 test i18n::tests::test_all_embedded_languages_parse_successfully ... ok
+test i18n::tests::test_all_languages_have_the_same_keys_as_fallback ... ok
+test i18n::tests::test_load_explicit_language ... ok
+test i18n::tests::test_detect_system_language_parses_locale_format ... ok
 test editor::clipboard::tests::test_clipboard_fallback_roundtrip ... ok
-test i18n::tests::test_missing_key_returns_key_itself ... ok
 test io::config::tests::test_config_defaults_on_missing_file ... ok
 test io::config::tests::test_config_loads_real_file ... ok
 test io::config::tests::test_config_loads_syntax_class_colors ... ok
 test i18n::tests::test_load_falls_back_to_english_for_unknown_language ... ok
-test i18n::tests::test_t1_replaces_placeholder ... ok
 test io::config::tests::test_config_plugins_enabled_can_be_emptied ... ok
-test io::config::tests::test_config_reads_plugins_section ... ok
 test io::config::tests::test_default_config_json_lists_every_syntax_color ... ok
+test io::config::tests::test_config_reads_plugins_section ... ok
 test io::config::tests::test_default_config_path_ends_with_config_json ... ok
+test i18n::tests::test_missing_key_returns_key_itself ... ok
 test io::config::tests::test_ensure_config_does_not_install_plugins_when_config_exists ... ok
 test io::config::tests::test_ensure_config_file_exists_creates_file_with_parent_dir ... ok
 test io::config::tests::test_ensure_config_file_exists_never_overwrites_existing_file ... ok
-test io::config::tests::test_ensure_config_installs_bundled_plugins_next_to_new_config ... ok
-test io::file_io::tests::test_open_directory_is_refused ... ok
 test io::config::tests::test_ensure_config_without_bundled_plugins_creates_no_plugins_dir ... ok
+test io::file_io::tests::test_open_directory_is_refused ... ok
+test i18n::tests::test_t1_replaces_placeholder ... ok
 test io::file_io::tests::test_open_existing_file ... ok
-test io::file_io::tests::test_open_non_utf8_file_is_refused_and_not_overwritten ... ok
-test io::file_io::tests::test_save_writes_to_disk ... ok
-test io::file_io::tests::test_open_nonexistent_file_creates_empty_buffer ... ok
+test io::config::tests::test_ensure_config_installs_bundled_plugins_next_to_new_config ... ok
 test io::config::tests::test_ensure_config_updates_installed_plugins_when_the_version_changes ... ok
-test i18n::tests::test_all_languages_have_the_same_keys_as_fallback ... ok
-test io::json::tests::test_json_invalid ... ok
+test io::file_io::tests::test_open_nonexistent_file_creates_empty_buffer ... ok
+test io::file_io::tests::test_open_non_utf8_file_is_refused_and_not_overwritten ... ok
 test io::json::tests::test_json_nested_object ... ok
-test io::json::tests::test_json_parsing ... ok
-test model::buffer::tests::test_delete_char_merges_rows ... ok
+test io::file_io::tests::test_save_writes_to_disk ... ok
+test io::json::tests::test_json_invalid ... ok
 test model::buffer::tests::test_dirty_flag ... ok
 test model::buffer::tests::test_insert_newline_splits_row ... ok
+test io::json::tests::test_json_parsing ... ok
+test model::buffer::tests::test_delete_char_merges_rows ... ok
 test model::buffer::tests::test_new_buffer_has_one_empty_line ... ok
 test model::buffer::tests::test_set_lines_empty_still_has_one_line ... ok
 test model::buffer::tests::test_to_string_content ... ok
 test model::row::tests::test_cx_rx_roundtrip ... ok
 test model::row::tests::test_insert_delete ... ok
 test model::row::tests::test_tab_expansion ... ok
-test model::row::tests::test_utf8_insert_delete ... ok
 test model::selection::tests::test_selection_range ... ok
 test model::utf8::tests::test_byte_offset_for_char_index ... ok
 test model::utf8::tests::test_char_index_for_byte_offset ... ok
@@ -143,25 +142,25 @@ test model::utf8::tests::test_find_pattern_matches_as_substring ... ok
 test model::utf8::tests::test_find_pattern_matches_inside_larger_word ... ok
 test model::utf8::tests::test_rfind_pattern_before ... ok
 test model::utf8::tests::test_substr_by_char ... ok
-test plugin::install::tests::test_bundled_directory_absent ... ok
+test model::row::tests::test_utf8_insert_delete ... ok
 test plugin::install::tests::test_bundled_directory_found_in_share_layout ... ok
+test plugin::install::tests::test_bundled_directory_absent ... ok
 test plugin::install::tests::test_bundled_directory_found_next_to_binary ... ok
-test plugin::install::tests::test_install_keeps_custom_plugins ... ok
-test plugin::install::tests::test_install_makes_copied_files_writable ... ok
-test plugin::install::tests::test_install_copies_plugins_recursively ... ok
-test plugin::install::tests::test_install_skips_entries_without_manifest ... ok
-test plugin::install::tests::test_install_with_missing_source_does_nothing ... ok
 test plugin::install::tests::test_install_replaces_an_existing_bundled_plugin ... ok
-test plugin::install::tests::test_update_never_creates_a_missing_plugins_directory ... ok
-test plugin::install::tests::test_install_writes_the_version_marker ... ok
-test plugin::install::tests::test_update_handles_plugins_installed_without_a_marker ... ok
+test plugin::install::tests::test_install_keeps_custom_plugins ... ok
+test plugin::install::tests::test_install_with_missing_source_does_nothing ... ok
+test plugin::install::tests::test_install_copies_plugins_recursively ... ok
+test plugin::install::tests::test_install_makes_copied_files_writable ... ok
 test plugin::install::tests::test_update_does_nothing_when_the_version_is_the_same ... ok
+test plugin::install::tests::test_install_writes_the_version_marker ... ok
+test plugin::install::tests::test_install_skips_entries_without_manifest ... ok
+test plugin::install::tests::test_update_never_creates_a_missing_plugins_directory ... ok
+test plugin::install::tests::test_update_handles_plugins_installed_without_a_marker ... ok
 test plugin::install::tests::test_update_replaces_plugins_when_the_version_changes ... ok
 test plugin::manager::bundled_plugin_tests::test_pretty_cat_renders_file_with_line_numbers ... ok
-test plugin::manager::bundled_plugin_tests::test_file_explorer_lists_directory_and_opens_file ... ok
+test plugin::manager::tests::test_spawn_nonexistent_command_fails ... ok
 test plugin::protocol::tests::test_incoming_text_cannot_carry_terminal_escape_sequences ... ok
 test plugin::protocol::tests::test_json_escape_handles_quotes_and_backslashes ... ok
-test plugin::manager::tests::test_spawn_nonexistent_command_fails ... ok
 test plugin::protocol::tests::test_open_file_path_is_not_altered ... ok
 test plugin::protocol::tests::test_outgoing_focus_message_shape ... ok
 test plugin::protocol::tests::test_outgoing_init_message_shape_fullscreen ... ok
@@ -171,8 +170,8 @@ test plugin::protocol::tests::test_parse_close_message ... ok
 test plugin::protocol::tests::test_parse_hex_color_with_and_without_hash ... ok
 test plugin::protocol::tests::test_parse_invalid_json_returns_none ... ok
 test plugin::protocol::tests::test_parse_open_file_message ... ok
-test plugin::protocol::tests::test_parse_render_message_with_panel_width ... ok
 test plugin::protocol::tests::test_parse_render_message ... ok
+test plugin::protocol::tests::test_parse_render_message_with_panel_width ... ok
 test plugin::protocol::tests::test_parse_status_message ... ok
 test plugin::protocol::tests::test_parse_unknown_type_is_unknown_not_error ... ok
 test plugin::registry::tests::test_command_with_slash_resolved_relative_to_plugin_dir ... ok
@@ -182,6 +181,7 @@ test plugin::registry::tests::test_load_manifest_basic_fields ... ok
 test plugin::registry::tests::test_load_manifest_missing_returns_none ... ok
 test plugin::registry::tests::test_load_manifest_without_command_returns_none ... ok
 test syntax::language_samples::every_language_sample_is_highlighted_as_expected ... ok
+test plugin::manager::bundled_plugin_tests::test_file_explorer_lists_directory_and_opens_file ... ok
 test syntax::parity_tests::pretty_cat_colors_every_language_sample_like_the_editor ... ok
 test syntax::parity_tests::pretty_cat_language_data_matches_the_editor ... ok
 test syntax::tests::test_case_insensitive_keywords ... ok
@@ -219,6 +219,14 @@ test view::help_text::tests::test_doc_visible_rows_leaves_title_and_last_row ...
 test view::help_text::tests::test_flatten_documentation_counts_header_entries_and_blank ... ok
 test view::help_text::tests::test_full_documentation_has_no_plugin_category_without_plugins ... ok
 test view::help_text::tests::test_full_documentation_lists_plugin_docs ... ok
+test view::indent_guides::tests::blank_rows_at_edges_have_no_guides ... ok
+test view::indent_guides::tests::blank_rows_use_smaller_neighbor_indent ... ok
+test view::indent_guides::tests::detects_four_spaces ... ok
+test view::indent_guides::tests::detects_tabs_as_tab_stop ... ok
+test view::indent_guides::tests::detects_two_spaces ... ok
+test view::indent_guides::tests::falls_back_to_language_default ... ok
+test view::indent_guides::tests::guide_columns_cover_complete_levels_only ... ok
+test view::indent_guides::tests::ignores_single_space_comment_continuations ... ok
 test view::sanitize::tests::test_del_and_c1_controls_are_neutralized ... ok
 test view::sanitize::tests::test_escape_sequences_are_neutralized ... ok
 test view::sanitize::tests::test_newline_and_carriage_return_are_neutralized ... ok
@@ -236,7 +244,7 @@ test plugin::manager::tests::test_spawn_and_roundtrip_with_cat ... ok
 test syntax::tests::test_update_syntax_cascade_is_iterative_and_does_not_overflow_the_stack ... ok
 test syntax::parity_tests::pretty_cat_colors_the_projects_own_files_like_the_editor ... ok
 
-test result: ok. 179 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+test result: ok. 187 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.52s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/cera-db7687ae4651fef9`
 
@@ -249,32 +257,32 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test arrow_down_on_last_line_appends_a_line ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.74s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.28s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/bundled_plugins-f5741d0d8772507a`
 
 running 5 tests
 test binary_without_bundled_plugins_creates_no_plugins_directory ... ok
-test first_run_installs_bundled_plugins_and_enables_them ... ok
 test existing_config_keeps_its_plugins_untouched ... ok
-test same_version_keeps_local_changes ... ok
+test first_run_installs_bundled_plugins_and_enables_them ... ok
 test new_version_updates_installed_plugins ... ok
+test same_version_keeps_local_changes ... ok
 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/escape_key-3e07fb81419e900d`
 
 running 1 test
 test escape_is_handled_immediately_and_does_not_swallow_input ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.50s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.51s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/paste-dc502ba479745c0a`
 
 running 1 test
 test multiline_paste_in_the_middle_of_a_file_is_inserted_as_one_block ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.09s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.11s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/plugin_languages-b4dae101d3ea0655`
 
@@ -285,7 +293,7 @@ test plugin_written_in_javascript_speaks_the_protocol ... ok
 test plugin_written_in_rust_speaks_the_protocol ... ok
 test plugin_written_in_cpp_speaks_the_protocol ... ok
 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.11s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/pretty_cat_languages-01f818e69756a6f1`
 
@@ -295,13 +303,13 @@ test cat_mode_reports_a_missing_file_and_continues ... ok
 test interactive_mode_sends_colored_segments_and_closes_on_q ... ok
 test cat_mode_colors_each_language_with_the_editor_palette ... ok
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
 
 [1m[92m     Running[0m `/home/runner/work/cera/cera/target/debug/deps/version-16fefda16938d94d`
 
 running 4 tests
-test version_does_not_create_the_config ... ok
 test short_version_prints_name_and_version ... ok
+test version_does_not_create_the_config ... ok
 test version_prints_name_and_version ... ok
 test version_wins_over_other_options ... ok
 
