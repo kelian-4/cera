@@ -56,6 +56,7 @@ pub struct Config {
     pub true_color: bool,
     pub show_line_numbers: bool,
     pub mouse_enabled: bool,
+    pub indent_guides: bool,
     pub theme: ThemeColors,
     pub language: Option<String>,
     pub plugins_enabled: Vec<String>,
@@ -70,6 +71,7 @@ impl Default for Config {
             true_color: true,
             show_line_numbers: true,
             mouse_enabled: true,
+            indent_guides: true,
             theme: ThemeColors::default(),
             language: None,
             plugins_enabled: vec![
@@ -121,6 +123,7 @@ fn default_config_json() -> String {
   "true_color": true,
   "show_line_numbers": true,
   "mouse_enabled": true,
+  "indent_guides": true,
   "language": null,
   "plugins": {
     "enabled": ["file-explorer", "pretty-cat", "finder", "diff", "grep"],
@@ -215,6 +218,11 @@ pub fn load_from_file(path: &str) -> (Config, bool) {
     if let Some(v) = root.get("mouse_enabled") {
         if v.is_bool() {
             cfg.mouse_enabled = v.as_bool(cfg.mouse_enabled);
+        }
+    }
+    if let Some(v) = root.get("indent_guides") {
+        if v.is_bool() {
+            cfg.indent_guides = v.as_bool(cfg.indent_guides);
         }
     }
     if let Some(v) = root.get("language") {

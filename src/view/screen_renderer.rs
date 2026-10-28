@@ -281,6 +281,17 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
         (Position::default(), Position::default())
     };
 
+    let guide_unit = if state.config.indent_guides {
+        let filetype = ob
+            .active_syntax_idx
+            .and_then(|i| crate::syntax::database().get(i))
+            .map(|s| s.filetype)
+            .unwrap_or("");
+        crate::view::indent_guides::detect_unit(buffer, filetype, crate::model::row::tab_stop())
+    } else {
+        0
+    };
+
     for y in 0..text_rows {
         let filerow = y + state.rowoff;
 
@@ -315,6 +326,15 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
             let row = buffer.row(filerow);
             let render_chars: Vec<char> = row.render().chars().collect();
             let hl = row.hl();
+
+            let (guide_indent, row_is_blank) = if guide_unit > 0 {
+                (
+                    crate::view::indent_guides::effective_indent(buffer, filerow),
+                    crate::view::indent_guides::row_indent(buffer, filerow).is_none(),
+                )
+            } else {
+                (0, false)
+            };
 
             let mut col_width_used = 0usize;
             let mut current_color_rgb: Option<u32> = None;
@@ -364,6 +384,12 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
                     if let Some(rgb) = current_color_rgb {
                         ab.append(&fg_sequence(rgb, true_color));
                     }
+                } else if ch == ' '
+                    && crate::view::indent_guides::is_guide_col(ci, guide_indent, guide_unit)
+                {
+                    current_color_rgb = Some(theme.line_number_fg);
+                    ab.append(&fg_sequence(theme.line_number_fg, true_color));
+                    ab.append("│");
                 } else {
                     let h = hl
                         .get(ci)
@@ -379,6 +405,24 @@ fn draw_rows(ab: &mut AppendBuffer, state: &ViewState) {
 
                 col_width_used += char_width;
                 ci += 1;
+            }
+
+            if row_is_blank && ci >= row.rsize() {
+                while ci < guide_indent && col_width_used < text_cols {
+                    if ci >= state.coloff
+                        && crate::view::indent_guides::is_guide_col(ci, guide_indent, guide_unit)
+                    {
+                        ab.append(&fg_sequence(theme.line_number_fg, true_color));
+                        ab.append("│");
+                    } else if ci >= state.coloff {
+                        ab.append(" ");
+                    } else {
+                        ci += 1;
+                        continue;
+                    }
+                    col_width_used += 1;
+                    ci += 1;
+                }
             }
 
             ab.append(reset_fg_sequence());
