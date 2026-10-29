@@ -232,45 +232,14 @@ Exemple :
 <details open>
 <summary><h2>Fonctionnalités expérimentales</h2></summary>
 
-Deux fonctionnalités sont encore **expérimentales** : elles sont désactivées par défaut, leur comportement peut encore changer et elles peuvent se tromper sur certains fichiers. Activez-les dans `config.json`.
+Ces fonctionnalités sont **expérimentales**, désactivées par défaut, et peuvent casser des fichiers. Utilisez-les sur des fichiers versionnés.
 
-### Guides d'indentation
-
-```json
-{ "indent_guides": true }
-```
-
-Cera trace un trait vertical `│` à chaque niveau d'indentation, pour tous les langages pris en charge.
-
-- Le guide du bloc qui contient le curseur est affiché plus clair, sur toute l'étendue du bloc. Sur une ligne d'en-tête (`fn main() {`, `if x:`), c'est le bloc qu'elle ouvre qui est mis en évidence.
-- La largeur d'un niveau est détectée pour chaque fichier : une tabulation si le fichier est indenté avec des tabulations, sinon le pas d'indentation le plus fréquent. Un fichier sans ligne indentée prend la valeur usuelle de son langage (2 espaces pour YAML, JSON, HTML, Ruby, JavaScript, TypeScript…, 4 sinon).
-- Les lignes vides prolongent les guides du bloc ; le texte des commentaires et des chaînes sur plusieurs lignes ne les coupe pas.
-- Les couleurs se règlent avec `theme.indent_guide` et `theme.indent_guide_active`.
-
-Limites : la détection est heuristique et peut se tromper sur un fichier dont l'indentation est irrégulière. Le texte n'est jamais modifié, seul l'affichage change.
-
-### Formatage à la sauvegarde
+- `indent_guides` : trace des guides d'indentation.
+- `format_on_save` : formate le fichier à la sauvegarde.
 
 ```json
-{ "format_on_save": true }
+{ "indent_guides": true, "format_on_save": true }
 ```
-
-À chaque `Ctrl-S`, Cera reformate le fichier avant de l'écrire. Ce n'est pas un formateur complet comme Prettier : il ne change que les **espaces**, il ne coupe ni ne regroupe les lignes longues et ne touche ni aux guillemets ni à l'intérieur d'une ligne.
-
-- **Tous les langages** : supprime les espaces en fin de ligne, garde au plus une ligne vide d'affilée (deux en Python) et retire les lignes vides au début et à la fin du fichier.
-- **Ré-indentation** selon la structure du fichier, pour :
-  - les langages à accolades : C, C++, C#, Java, JavaScript, TypeScript, Go, Rust, PHP, Kotlin, Dart, D, Groovy, Solidity, Zig, CSS, SCSS, JSON, Protobuf, GraphQL, HCL ;
-  - les langages à mots-clés : Ruby, Crystal, Lua, Julia, shell ;
-  - les langages à indentation significative : Python (4 espaces), YAML, Nim, CoffeeScript (2 espaces) ;
-  - HTML et XML.
-- Les autres langages ne reçoivent que le nettoyage des espaces. Markdown, diff et LaTeX ne sont pas touchés.
-- L'indentation utilise celle du fichier (tabulations ou espaces, largeur détectée), sauf Go (tabulations), Python et YAML (espaces). En C et C++, les arguments alignés sous la parenthèse sont conservés.
-- Le contenu des chaînes sur plusieurs lignes, des heredocs et des blocs `pre`, `script` et `style` n'est jamais modifié.
-- Le formatage est annulable en une seule fois avec `Ctrl-Z`, et le curseur reste à sa place.
-
-Garde-fous : le formatage ne s'applique pas, sans message, quand le fichier n'est pas reconnu de façon fiable : accolades, balises ou blocs déséquilibrés, JSX, PHP mêlé de HTML, chaîne non terminée, HTML aux balises de fin optionnelles. Dans ces cas, seul le nettoyage des espaces est fait, ou rien. Un formatage qui changerait autre chose que des espaces est abandonné.
-
-Comme la fonctionnalité est expérimentale, utilisez-la sur des fichiers versionnés (par exemple avec Git) pour pouvoir relire les changements.
 
 </details>
 

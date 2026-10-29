@@ -215,45 +215,14 @@ Example:
 <details open>
 <summary><h2>Experimental features</h2></summary>
 
-Two features are still **experimental**: they are disabled by default, their behavior may still change and they can be wrong on some files. Enable them in `config.json`.
+These features are **experimental**, disabled by default, and can break files. Use them on versioned files.
 
-### Indentation guides
-
-```json
-{ "indent_guides": true }
-```
-
-Cera draws a vertical `│` line at each indentation level, for every supported language.
-
-- The guide of the block that contains the cursor is drawn brighter, over the whole extent of the block. On a header line (`fn main() {`, `if x:`), the block it opens is highlighted.
-- The width of a level is detected for each file: a tab if the file is indented with tabs, otherwise the most frequent indentation step. A file with no indented line gets the usual value for its language (2 spaces for YAML, JSON, HTML, Ruby, JavaScript, TypeScript…, 4 otherwise).
-- Blank lines extend the guides of the block; the text of multi-line comments and strings does not break them.
-- Colors are set with `theme.indent_guide` and `theme.indent_guide_active`.
-
-Limits: detection is heuristic and can be wrong on a file with irregular indentation. The text is never modified, only the display changes.
-
-### Formatting on save
+- `indent_guides`: draws indentation guides.
+- `format_on_save`: formats the file on save.
 
 ```json
-{ "format_on_save": true }
+{ "indent_guides": true, "format_on_save": true }
 ```
-
-On every `Ctrl-S`, Cera reformats the file before writing it. It is not a full formatter like Prettier: it only changes **whitespace**, it neither splits nor joins long lines and does not touch quotes or the inside of a line.
-
-- **All languages**: removes trailing whitespace, keeps at most one blank line in a row (two in Python) and removes blank lines at the start and end of the file.
-- **Re-indentation** based on the structure of the file, for:
-  - bracket languages: C, C++, C#, Java, JavaScript, TypeScript, Go, Rust, PHP, Kotlin, Dart, D, Groovy, Solidity, Zig, CSS, SCSS, JSON, Protobuf, GraphQL, HCL;
-  - keyword languages: Ruby, Crystal, Lua, Julia, shell;
-  - indentation-based languages: Python (4 spaces), YAML, Nim, CoffeeScript (2 spaces);
-  - HTML and XML.
-- Other languages only get the whitespace cleanup. Markdown, diff and LaTeX are not touched.
-- Indentation follows the file's own style (tabs or spaces, detected width), except Go (tabs), Python and YAML (spaces). In C and C++, arguments aligned under the parenthesis are kept.
-- The content of multi-line strings, heredocs and `pre`, `script` and `style` blocks is never modified.
-- Formatting can be undone in one step with `Ctrl-Z`, and the cursor stays in place.
-
-Safeguards: formatting is silently skipped when the file cannot be understood reliably: unbalanced brackets, tags or blocks, JSX, PHP mixed with HTML, an unterminated string, HTML with optional end tags. In those cases only the whitespace cleanup is done, or nothing. A formatting that would change anything other than whitespace is abandoned.
-
-Since the feature is experimental, use it on versioned files (for example with Git) so you can review the changes.
 
 </details>
 
