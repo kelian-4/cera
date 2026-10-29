@@ -36,12 +36,23 @@ La liste complète des fonctionnalités et des raccourcis est dans l'éditeur : 
 <details open>
 <summary><h2>Installation</h2></summary>
 
+Cera cible Linux (x86_64 et aarch64). Il faut un terminal compatible ANSI ; les couleurs 24 bits sont recommandées (sinon, mettez `true_color` à `false`, voir [Configuration](#configuration)). Les plugins fournis demandent `python3`.
+
+| Méthode | Pour qui | Plugins |
+|---|---|---|
+| [Nix](#avec-nix) | NixOS, ou Nix sur n'importe quelle distribution | copiés et activés au premier lancement |
+| [Paquet `.deb` ou `.rpm`](#depuis-une-release-debian-ubuntu-fedora) | Debian, Ubuntu, Fedora… | copiés et activés au premier lancement |
+| [Archive `.tar.gz`](#depuis-une-release-debian-ubuntu-fedora) | toute distribution Linux | copiés au premier lancement si le dossier `plugins` est à côté du binaire, sinon avec `plugins/install.sh` |
+| [PKGBUILD](#sur-arch-linux) | Arch Linux et dérivés | copiés et activés au premier lancement |
+| [Sources](#depuis-les-sources) | développeurs | à copier avec `plugins/install.sh` |
+
 ### Avec Nix
 
 ```
 nix run github:kelian-4/cera       # essayer sans installer
-nix build                          # construire dans ./result
-nix develop                        # shell de développement
+nix profile install github:kelian-4/cera   # installer pour l'utilisateur courant
+nix build                          # construire dans ./result (depuis le dépôt)
+nix develop                        # shell de développement (depuis le dépôt)
 ```
 
 Dans une configuration NixOS qui utilise les flakes :
@@ -55,31 +66,72 @@ inputs.cera = {
 # dans la liste des modules :
 { environment.systemPackages = [ inputs.cera.packages.${system}.default ]; }
 ```
-Au premier lancement, Cera copie les plugins fournis dans `~/.config/cera/plugins` et les active : voir [PLUGINS.md](PLUGINS.md).
+
+Le paquet Nix embarque `python3` pour les plugins fournis.
 
 ### Depuis une release (Debian, Ubuntu, Fedora…)
 
 Les paquets (x86_64 et aarch64) sont sur la [page des releases](https://github.com/kelian-4/cera/releases) :
 
 ```
-sudo apt install ./cera_0.1.0_amd64.deb         # Debian, Ubuntu
-sudo dnf install ./cera-0.1.0-1.x86_64.rpm      # Fedora
-tar -xzf cera-0.1.0-linux-x86_64.tar.gz         # archive : binaire + plugins
+sudo apt install ./cera_0.1.0_amd64.deb         # Debian, Ubuntu (arm64 : cera_0.1.0_arm64.deb)
+sudo dnf install ./cera-0.1.0-1.x86_64.rpm      # Fedora (aarch64 : cera-0.1.0-1.aarch64.rpm)
 ```
 
-Chaque release contient aussi un fichier `SHA256SUMS` pour vérifier les téléchargements.
+L'archive contient le binaire et les plugins, sans rien installer dans le système :
+
+```
+tar -xzf cera-0.1.0-linux-x86_64.tar.gz
+cd cera-0.1.0-linux-x86_64
+./cera                                   # essayer sur place
+install -Dm755 cera ~/.local/bin/cera    # installer (vérifiez que ~/.local/bin est dans le PATH)
+./plugins/install.sh                     # copier les plugins dans ~/.config/cera/plugins
+```
+
+Chaque release contient aussi un fichier `SHA256SUMS` pour vérifier les téléchargements :
+
+```
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+### Sur Arch Linux
+
+Un `PKGBUILD` est fourni dans `packaging/aur`. Il construit Cera depuis l'archive de la release `v0.1.0` et lance les tests :
+
+```
+git clone https://github.com/kelian-4/cera
+cd cera/packaging/aur
+makepkg -si
+```
 
 ### Depuis les sources
 
-Il faut uniquement avoir Rust installé :
+Il faut Rust (toolchain stable, avec `cargo`) et `git`. Aucune autre dépendance de construction.
 
 ```
+git clone https://github.com/kelian-4/cera
+cd cera
 cargo build --release
-./target/release/cera
-./plugins/install.sh      # copie les plugins dans ~/.config/cera/plugins
+cargo test                                       # facultatif
+install -Dm755 target/release/cera ~/.local/bin/cera
+./plugins/install.sh                             # copie les plugins dans ~/.config/cera/plugins
 ```
 
-Les plugins fournis demandent `python3`.
+`cargo install --path .` installe aussi le binaire (dans `~/.cargo/bin`) mais pas les plugins : lancez ensuite `./plugins/install.sh`.
+
+### Premier lancement
+
+Au premier lancement, Cera crée `~/.config/cera/config.json` (ou `$XDG_CONFIG_HOME/cera/config.json`) et, quand il trouve les plugins fournis à côté de lui (`../share/cera/plugins` ou `plugins/`), les copie dans `~/.config/cera/plugins` et les active : voir [PLUGINS.md](PLUGINS.md). Vérifiez l'installation avec :
+
+```
+cera --version
+```
+
+### Mise à jour et désinstallation
+
+- **Mise à jour** : réinstallez la nouvelle version avec la même méthode. Votre `config.json` n'est jamais modifié : une option ajoutée par la nouvelle version garde sa valeur par défaut tant que vous ne l'écrivez pas. Les plugins fournis sont remplacés à chaque changement de version (voir [PLUGINS.md](PLUGINS.md)).
+- **Désinstallation** : `sudo apt remove cera`, `sudo dnf remove cera` ou `sudo pacman -R cera` selon la méthode ; pour une installation manuelle, supprimez `~/.local/bin/cera`.
+- **Données utilisateur** : la configuration et les plugins copiés restent dans `~/.config/cera` ; supprimez ce dossier pour repartir de zéro.
 
 </details>
 
@@ -124,7 +176,109 @@ Les options `-a`, `-f`, `-g` et `-d` sont fournies par des plugins : elles ne fo
 <details open>
 <summary><h2>Configuration</h2></summary>
 
-Au premier lancement, Cera crée `~/.config/cera/config.json`. Ce fichier contient toutes les clés disponibles avec leurs valeurs par défaut : largeur des tabulations, couleurs, langue de l'interface, plugins activés, souris, numéros de ligne. Modifiez-le directement ; une clé absente garde sa valeur par défaut.
+Au premier lancement, Cera crée `~/.config/cera/config.json` (ou `$XDG_CONFIG_HOME/cera/config.json`). Ce fichier contient toutes les clés disponibles avec leurs valeurs par défaut. Modifiez-le directement et relancez Cera. Une clé absente garde sa valeur par défaut ; un fichier qui n'est pas du JSON valide est ignoré et toutes les valeurs par défaut s'appliquent.
+
+### Options générales
+
+| Clé | Valeurs | Défaut | Effet |
+|---|---|---|---|
+| `tab_stop` | entier ≥ 1 | `8` | Largeur d'affichage d'une tabulation, en colonnes |
+| `quit_times` | entier | `1` | Avec `1`, quitter (`Ctrl-Q`) avec des modifications non enregistrées demande une confirmation ; avec `0`, Cera quitte sans demander |
+| `true_color` | `true` / `false` | `true` | `true` : couleurs 24 bits ; `false` : 256 couleurs, pour les terminaux qui n'affichent pas le 24 bits |
+| `show_line_numbers` | `true` / `false` | `true` | Affiche la colonne des numéros de ligne |
+| `mouse_enabled` | `true` / `false` | `true` | Active la souris (positionnement du curseur, sélection, molette) |
+| `language` | `"fr"`, `"en"`, `"es"` ou `null` | `null` | Langue de l'interface ; `null` : langue du système, puis anglais (voir [Traductions](#traductions)) |
+| `indent_guides` | `true` / `false` | `false` | Guides d'indentation, **expérimental** : voir [Fonctionnalités expérimentales](#fonctionnalités-expérimentales) |
+| `format_on_save` | `true` / `false` | `false` | Formatage à la sauvegarde, **expérimental** : voir [Fonctionnalités expérimentales](#fonctionnalités-expérimentales) |
+
+### Plugins
+
+| Clé | Valeurs | Défaut | Effet |
+|---|---|---|---|
+| `plugins.enabled` | liste d'identifiants | `["file-explorer", "pretty-cat", "finder", "diff", "grep"]` | Plugins actifs. Un identifiant est le nom du dossier du plugin. Si la clé est absente, tous les plugins fournis sont actifs |
+| `plugins.directory` | chemin ou `null` | `null` | Dossier où chercher les plugins ; `null` : `~/.config/cera/plugins` (ou `$XDG_CONFIG_HOME/cera/plugins`) |
+
+### Thème
+
+Les couleurs se règlent dans la section `theme`, au format `"#RRGGBB"`. Une couleur invalide est ignorée.
+
+| Clé | Défaut | Utilisée pour |
+|---|---|---|
+| `normal` | `#E8EDF2` | texte courant |
+| `comment` | `#8FA3B8` | commentaires |
+| `keyword1` | `#82C0FF` | mots-clés principaux |
+| `keyword2` | `#8CF5D6` | mots-clés secondaires |
+| `string` | `#A8E6CF` | chaînes de caractères |
+| `number` | `#C9A8FF` | nombres |
+| `type` | `#FFD08A` | types |
+| `function` | `#F9A8D4` | fonctions |
+| `constant` | `#FF8FA3` | constantes |
+| `operator` | `#B4C2D4` | opérateurs |
+| `preprocessor` | `#D4E27A` | directives de préprocesseur |
+| `variable` | `#FFC6A5` | variables |
+| `escape` | `#FFB86B` | séquences d'échappement |
+| `match` | `#FFFF66` | résultats de recherche |
+| `line_number_fg` | `#7BA3C9` | numéros de ligne |
+| `indent_guide` | `#3F4E63` | guides d'indentation |
+| `indent_guide_active` | `#7BA3C9` | guide du bloc contenant le curseur |
+| `error_fg` | `#FF8A8A` | messages d'erreur |
+| `success_fg` | `#9CE89C` | messages de réussite |
+
+Exemple :
+
+```json
+{
+  "tab_stop": 4,
+  "true_color": false,
+  "indent_guides": true,
+  "theme": { "keyword1": "#ff5555" }
+}
+```
+
+</details>
+
+<details open>
+<summary><h2>Fonctionnalités expérimentales</h2></summary>
+
+Deux fonctionnalités sont encore **expérimentales** : elles sont désactivées par défaut, leur comportement peut encore changer et elles peuvent se tromper sur certains fichiers. Activez-les dans `config.json`.
+
+### Guides d'indentation
+
+```json
+{ "indent_guides": true }
+```
+
+Cera trace un trait vertical `│` à chaque niveau d'indentation, pour tous les langages pris en charge.
+
+- Le guide du bloc qui contient le curseur est affiché plus clair, sur toute l'étendue du bloc. Sur une ligne d'en-tête (`fn main() {`, `if x:`), c'est le bloc qu'elle ouvre qui est mis en évidence.
+- La largeur d'un niveau est détectée pour chaque fichier : une tabulation si le fichier est indenté avec des tabulations, sinon le pas d'indentation le plus fréquent. Un fichier sans ligne indentée prend la valeur usuelle de son langage (2 espaces pour YAML, JSON, HTML, Ruby, JavaScript, TypeScript…, 4 sinon).
+- Les lignes vides prolongent les guides du bloc ; le texte des commentaires et des chaînes sur plusieurs lignes ne les coupe pas.
+- Les couleurs se règlent avec `theme.indent_guide` et `theme.indent_guide_active`.
+
+Limites : la détection est heuristique et peut se tromper sur un fichier dont l'indentation est irrégulière. Le texte n'est jamais modifié, seul l'affichage change.
+
+### Formatage à la sauvegarde
+
+```json
+{ "format_on_save": true }
+```
+
+À chaque `Ctrl-S`, Cera reformate le fichier avant de l'écrire. Ce n'est pas un formateur complet comme Prettier : il ne change que les **espaces**, il ne coupe ni ne regroupe les lignes longues et ne touche ni aux guillemets ni à l'intérieur d'une ligne.
+
+- **Tous les langages** : supprime les espaces en fin de ligne, garde au plus une ligne vide d'affilée (deux en Python) et retire les lignes vides au début et à la fin du fichier.
+- **Ré-indentation** selon la structure du fichier, pour :
+  - les langages à accolades : C, C++, C#, Java, JavaScript, TypeScript, Go, Rust, PHP, Kotlin, Dart, D, Groovy, Solidity, Zig, CSS, SCSS, JSON, Protobuf, GraphQL, HCL ;
+  - les langages à mots-clés : Ruby, Crystal, Lua, Julia, shell ;
+  - les langages à indentation significative : Python (4 espaces), YAML, Nim, CoffeeScript (2 espaces) ;
+  - HTML et XML.
+- Les autres langages ne reçoivent que le nettoyage des espaces. Markdown, diff et LaTeX ne sont pas touchés.
+- L'indentation utilise celle du fichier (tabulations ou espaces, largeur détectée), sauf Go (tabulations), Python et YAML (espaces). En C et C++, les arguments alignés sous la parenthèse sont conservés.
+- Le contenu des chaînes sur plusieurs lignes, des heredocs et des blocs `pre`, `script` et `style` n'est jamais modifié.
+- Le formatage est annulable en une seule fois avec `Ctrl-Z`, et le curseur reste à sa place.
+
+Garde-fous : le formatage ne s'applique pas, sans message, quand le fichier n'est pas reconnu de façon fiable : accolades, balises ou blocs déséquilibrés, JSX, PHP mêlé de HTML, chaîne non terminée, HTML aux balises de fin optionnelles. Dans ces cas, seul le nettoyage des espaces est fait, ou rien. Un formatage qui changerait autre chose que des espaces est abandonné.
+
+Comme la fonctionnalité est expérimentale, utilisez-la sur des fichiers versionnés (par exemple avec Git) pour pouvoir relire les changements.
 
 </details>
 
@@ -151,6 +305,7 @@ src/                  code source de l'éditeur
 ├─ editor/            boucle principale, buffers, annulation, presse-papier
 ├─ terminal/          mode brut, lecture des touches, souris, collage encadré
 ├─ syntax/            moteur de coloration et un fichier par langage
+├─ format/            formatage à la sauvegarde (expérimental)
 ├─ plugin/            protocole, sous-processus, découverte des plugins
 ├─ view/              rendu de l'écran, aide intégrée
 ├─ io/                configuration, lecture/écriture de fichiers, JSON

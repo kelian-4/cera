@@ -76,8 +76,8 @@ impl Default for Config {
             true_color: true,
             show_line_numbers: true,
             mouse_enabled: true,
-            indent_guides: true,
-            format_on_save: true,
+            indent_guides: false,
+            format_on_save: false,
             theme: ThemeColors::default(),
             language: None,
             plugins_enabled: vec![
@@ -129,8 +129,8 @@ fn default_config_json() -> String {
   "true_color": true,
   "show_line_numbers": true,
   "mouse_enabled": true,
-  "indent_guides": true,
-  "format_on_save": true,
+  "indent_guides": false,
+  "format_on_save": false,
   "language": null,
   "plugins": {
     "enabled": ["file-explorer", "pretty-cat", "finder", "diff", "grep"],
@@ -357,21 +357,17 @@ mod tests {
 
     #[test]
     fn test_format_on_save_and_indent_guides_options() {
-        assert!(Config::default().format_on_save);
-        assert!(Config::default().indent_guides);
+        assert!(!Config::default().format_on_save);
+        assert!(!Config::default().indent_guides);
 
         let path = "/tmp/cera_rust_test_config_format.json";
         let mut f = fs::File::create(path).unwrap();
-        writeln!(
-            f,
-            r##"{{"format_on_save": false, "indent_guides": false}}"##
-        )
-        .unwrap();
+        writeln!(f, r##"{{"format_on_save": true, "indent_guides": true}}"##).unwrap();
 
         let (cfg, loaded) = load_from_file(path);
         assert!(loaded);
-        assert!(!cfg.format_on_save);
-        assert!(!cfg.indent_guides);
+        assert!(cfg.format_on_save);
+        assert!(cfg.indent_guides);
 
         let _ = fs::remove_file(path);
     }
