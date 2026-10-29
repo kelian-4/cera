@@ -22,6 +22,7 @@ pub struct Profile {
     pub heredoc: bool,
     pub backslash: bool,
     pub guard_if: bool,
+    pub preserve: bool,
     pub kw: Option<&'static KwProfile>,
 }
 
@@ -161,6 +162,7 @@ fn starts_continuation(toks: &[Tok], tail: &[Tok], rust: bool) -> bool {
         Some(Tok::Sym('-')) => second == Some(&Tok::Sym('>')),
         Some(Tok::Sym('+')) => second != Some(&Tok::Sym('+')),
         Some(Tok::Sym(':')) => second != Some(&Tok::Sym(':')),
+        Some(Tok::Sym('<')) => second == Some(&Tok::Sym('<')),
         _ => false,
     }
 }
@@ -250,6 +252,7 @@ pub fn plan(buffer: &Buffer, p: &Profile, unit: usize) -> Option<Vec<Plan>> {
         let mut is_label = false;
         let mut op_start = false;
         let mut guard = false;
+        let mut shift_row = false;
         let kw_first = match (p.kw, first_word) {
             (Some(kw), Some(w)) if kw_ok(kw, toks, 0, stack.last(), false) => {
                 if is_kw_closer(kw, w) || is_kw_middle(kw, w) {
@@ -342,19 +345,29 @@ pub fn plan(buffer: &Buffer, p: &Profile, unit: usize) -> Option<Vec<Plan>> {
                         chain_at = if chain { Some(l) } else { None };
                     }
                     op_start = !chain;
+                    shift_row = p.preserve;
                 } else if top_is_brace && continues_previous(&tail) && !starts_block {
                     l += 1;
                     cont_head = 1;
                     chain_at = None;
+                    shift_row = p.preserve;
                 } else {
                     cont_head = 0;
                     chain_at = None;
                 }
             }
+            if p.preserve
+                && has_code
+                && stack
+                    .last()
+                    .is_some_and(|e| e.inline && matches!(e.kind, Kind::Br('(') | Kind::Br('[')))
+            {
+                shift_row = true;
+            }
             level = l;
         }
 
-        let forced_shift = p.backslash && prev_backslash;
+        let forced_shift = (p.backslash && prev_backslash) || shift_row;
         plans.push(if forced_shift {
             Plan::Shift
         } else {

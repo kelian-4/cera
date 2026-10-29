@@ -1,3 +1,4 @@
+pub mod markup;
 pub mod offside;
 pub mod structure;
 pub mod tokens;
@@ -36,7 +37,12 @@ const C_LIKE: Profile = Profile {
     heredoc: false,
     backslash: false,
     guard_if: false,
+    preserve: false,
     kw: None,
+};
+const CPP_LIKE: Profile = Profile {
+    preserve: true,
+    ..C_LIKE
 };
 const JAVA_LIKE: Profile = Profile {
     preproc: false,
@@ -124,6 +130,7 @@ const RUBY_LIKE: Profile = Profile {
     heredoc: true,
     backslash: false,
     guard_if: false,
+    preserve: false,
     kw: Some(&RUBY_KW),
 };
 const CRYSTAL_LIKE: Profile = Profile {
@@ -152,6 +159,7 @@ enum Policy {
     Hygiene,
     Structure(&'static Profile),
     Offside(offside::Profile),
+    Markup { html: bool },
 }
 
 struct Rules {
@@ -169,8 +177,11 @@ fn rules_for(buffer: &Buffer, filetype: &str) -> Rules {
         force_tabs: None,
     };
     match filetype {
-        "" | "markdown" | "diff" | "html" | "xml" | "latex" => r.policy = Policy::Off,
-        "c" | "cpp" | "csharp" => r.policy = Policy::Structure(&C_LIKE),
+        "" | "markdown" | "diff" | "latex" => r.policy = Policy::Off,
+        "html" => r.policy = Policy::Markup { html: true },
+        "xml" => r.policy = Policy::Markup { html: false },
+        "c" | "cpp" => r.policy = Policy::Structure(&CPP_LIKE),
+        "csharp" => r.policy = Policy::Structure(&C_LIKE),
         "javascript" | "typescript" => {
             if !looks_like_jsx(buffer) {
                 r.policy = Policy::Structure(&JAVA_LIKE);
@@ -313,7 +324,8 @@ pub fn format_buffer(buffer: &Buffer, filetype: &str, tab_stop: usize) -> Option
         return None;
     }
 
-    if (0..buffer.num_rows()).any(|i| tokens::row_opens_string(buffer, i)) {
+    let skip_guard = matches!(rules.policy, Policy::Markup { .. }) || filetype == "yaml";
+    if !skip_guard && (0..buffer.num_rows()).any(|i| tokens::row_opens_string(buffer, i)) {
         return None;
     }
 
@@ -332,6 +344,7 @@ pub fn format_buffer(buffer: &Buffer, filetype: &str, tab_stop: usize) -> Option
     let planned = match &rules.policy {
         Policy::Structure(p) => structure::plan(buffer, p, unit_cols),
         Policy::Offside(p) => offside::plan(buffer, p),
+        Policy::Markup { html } => Some(markup::plan(buffer, *html, unit_cols)?),
         _ => None,
     };
     let reindented = planned.is_some();

@@ -304,3 +304,73 @@ fn output_is_stable_when_formatted_twice() {
     let twice = fmt("rust", &once);
     assert_eq!(once, twice);
 }
+
+#[test]
+fn html_nesting_and_void_elements() {
+    let src = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>T</title>\n</head>\n<body>\n<div>\n<br>\n<p>text <b>bold</b></p>\n</div>\n</body>\n</html>\n";
+    let out = fmt("html", src);
+    assert_eq!(
+        out,
+        "<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>T</title>\n  </head>\n  <body>\n    <div>\n      <br>\n      <p>text <b>bold</b></p>\n    </div>\n  </body>\n</html>"
+    );
+}
+
+#[test]
+fn html_multiline_tag_attributes() {
+    let src = "<div\nclass=\"a\"\nid=\"b\"\n>\n<span>x</span>\n</div>\n";
+    let out = fmt("html", src);
+    assert_eq!(
+        out,
+        "<div\n  class=\"a\"\n  id=\"b\"\n>\n  <span>x</span>\n</div>"
+    );
+}
+
+#[test]
+fn html_pre_script_and_style_are_untouched() {
+    let src = "<div>\n<pre>\n  keep   \n    this\n</pre>\n<script>\nif (a) {\n      b();\n}\n</script>\n</div>\n";
+    let out = fmt("html", src);
+    assert_eq!(
+        out,
+        "<div>\n  <pre>\n  keep   \n    this\n  </pre>\n  <script>\nif (a) {\n      b();\n}\n  </script>\n</div>"
+    );
+}
+
+#[test]
+fn html_comments_move_with_their_opener() {
+    let src = "<div>\n<!--\n   note\n-->\n<p>x</p>\n</div>\n";
+    let out = fmt("html", src);
+    assert_eq!(out, "<div>\n  <!--\n     note\n  -->\n  <p>x</p>\n</div>");
+}
+
+#[test]
+fn xml_self_closing_and_declaration() {
+    let src = "<?xml version=\"1.0\"?>\n<root>\n<a>\n<b/>\n<c x=\"1\"/>\n</a>\n</root>\n";
+    let out = fmt("xml", src);
+    assert_eq!(
+        out,
+        "<?xml version=\"1.0\"?>\n<root>\n  <a>\n    <b/>\n    <c x=\"1\"/>\n  </a>\n</root>"
+    );
+}
+
+#[test]
+fn html_with_unclosed_optional_tags_is_left_alone() {
+    let b = buffer_for("html", "<ul>\n<li>one\n<li>two\n</ul>\n");
+    assert!(format_buffer(&b, "html", 8).is_none());
+}
+
+#[test]
+fn c_aligned_arguments_keep_their_alignment() {
+    let src = "void f() {\nprintf(\"%d %d\",\n       a, b);\nstream << x\n       << y;\n}\n";
+    let out = fmt("c", src);
+    assert_eq!(
+        out,
+        "void f() {\n    printf(\"%d %d\",\n           a, b);\n    stream << x\n           << y;\n}"
+    );
+}
+
+#[test]
+fn include_directive_is_not_an_open_string() {
+    let src = "#include <stdio.h>\nint main() {\nreturn 0;\n}\n";
+    let out = fmt("c", src);
+    assert_eq!(out, "#include <stdio.h>\nint main() {\n    return 0;\n}");
+}

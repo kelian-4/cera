@@ -191,6 +191,8 @@ pub fn row_opens_string(buffer: &Buffer, idx: usize) -> bool {
         let prev = buffer.row(idx - 1).hl_state;
         prev.string != 0 || prev.inner_string != 0 || prev.embed != 0
     };
-    let closed = is_quote(render[last]) && (continues || (last > start && is_quote(render[start])));
+    let quoted = is_quote(render[last]) && (continues || (last > start && is_quote(render[start])));
+    let angled = render[start] == '<' && render[last] == '>';
+    let closed = quoted || angled;
     !closed
 }
