@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod editor;
+pub mod format;
 pub mod i18n;
 pub mod io;
 pub mod model;

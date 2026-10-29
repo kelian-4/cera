@@ -3,6 +3,7 @@ use std::io;
 use crate::editor::buffer_manager::BufferManager;
 use crate::editor::clipboard::Clipboard;
 use crate::editor::undo_stack::{EditAction, EditKind};
+use crate::format;
 use crate::io::config::Config;
 use crate::io::file_io;
 use crate::model::row::{self};
@@ -702,6 +703,85 @@ impl Editor {
         self.set_status_message(self.i18n.t("status.line_cut"));
     }
 
+    fn format_active_buffer(&mut self) {
+        if !self.config.format_on_save {
+            return;
+        }
+        let tab_stop = row::tab_stop();
+        let (formatted, old_lines, old_cursor) = {
+            let ob = self.buffer_manager.active();
+            let filetype = ob
+                .active_syntax_idx
+                .and_then(|i| self.syntax_db.get(i))
+                .map(|s| s.filetype)
+                .unwrap_or("");
+            let Some(formatted) = format::format_buffer(&ob.buffer, filetype, tab_stop) else {
+                return;
+            };
+            let old_lines: Vec<String> = ob
+                .buffer
+                .rows()
+                .iter()
+                .map(|r| r.chars().to_string())
+                .collect();
+            (formatted, old_lines, ob.cursor)
+        };
+        let new_lines: Vec<String> = formatted.rows.iter().map(|r| r.text.clone()).collect();
+        if new_lines == old_lines {
+            return;
+        }
+
+        let new_row = formatted
+            .rows
+            .iter()
+            .rposition(|r| r.src <= old_cursor.cy)
+            .unwrap_or(0);
+        let target = &formatted.rows[new_row];
+        let new_size = utf8::codepoint_count(&target.text);
+        let new_col = if target.src == old_cursor.cy {
+            if old_cursor.cx <= target.old_lead {
+                target.new_lead
+            } else {
+                old_cursor.cx - target.old_lead + target.new_lead
+            }
+        } else {
+            0
+        }
+        .min(new_size);
+
+        let old_text = old_lines.join("\n");
+        let new_text = new_lines.join("\n");
+
+        {
+            let ob = self.buffer_manager.active_mut();
+            ob.selection.is_active = false;
+            ob.buffer.set_lines(&new_lines);
+            ob.buffer.mark_dirty();
+        }
+        let active_syntax_idx = self.buffer_manager.active().active_syntax_idx;
+        if let Some(sidx) = active_syntax_idx {
+            let syn = &self.syntax_db[sidx];
+            let buf = &mut self.buffer_manager.active_mut().buffer;
+            for r in 0..buf.num_rows() {
+                syntax::update_syntax(buf, r, Some(syn));
+            }
+        }
+
+        let ob = self.buffer_manager.active_mut();
+        ob.cursor.cy = new_row;
+        ob.cursor.cx = new_col;
+        ob.undo_stack.break_coalescing();
+        ob.undo_stack.push(EditAction {
+            start: Position::new(0, 0),
+            removed_text: old_text,
+            inserted_text: new_text,
+            cursor_before: Position::new(old_cursor.cy, old_cursor.cx),
+            cursor_after: Position::new(new_row, new_col),
+            kind: EditKind::ReplaceBlock,
+        });
+        ob.undo_stack.break_coalescing();
+    }
+
     fn save(&mut self) {
         let has_filename = self.buffer_manager.active().buffer.filename().is_some();
 
@@ -742,6 +822,7 @@ impl Editor {
             .filename()
             .unwrap()
             .to_string();
+        self.format_active_buffer();
         match file_io::save_file(&mut self.buffer_manager.active_mut().buffer) {
             Ok(()) => {
                 self.set_status_message_kind(filename, MessageKind::Success);

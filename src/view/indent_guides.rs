@@ -4,7 +4,7 @@ const SCAN_ROWS: usize = 1000;
 const LOOKAROUND: usize = 500;
 const MAX_BLOCK_SCAN: usize = 2000;
 
-fn default_unit(filetype: &str) -> usize {
+pub fn default_unit(filetype: &str) -> usize {
     match filetype {
         "yaml" | "json" | "html" | "xml" | "css" | "scss" | "ruby" | "javascript"
         | "typescript" | "lisp" | "scheme" | "clojure" | "elixir" | "crystal" | "dart"
@@ -25,9 +25,6 @@ fn leading_spaces(render: &str) -> Option<usize> {
     None
 }
 
-/// True when the row starts inside a multi-line comment or string, as
-/// computed by the syntax engine. Such rows carry free-form text whose
-/// indentation says nothing about code structure.
 fn starts_in_literal(buffer: &Buffer, idx: usize) -> bool {
     if idx == 0 {
         return false;
@@ -36,9 +33,6 @@ fn starts_in_literal(buffer: &Buffer, idx: usize) -> bool {
     s.inner_comment || s.inner_string != 0 || s.comment || (s.string != 0 && s.embed == 0)
 }
 
-/// Indent (in render columns) of a row as far as code structure is concerned.
-/// Rows inside a multi-line comment or string inherit the indent of the row
-/// where the comment or string started. `None` for blank rows outside of them.
 fn structural_indent(buffer: &Buffer, idx: usize) -> Option<usize> {
     if starts_in_literal(buffer, idx) {
         let mut j = idx - 1;
@@ -51,14 +45,10 @@ fn structural_indent(buffer: &Buffer, idx: usize) -> Option<usize> {
     leading_spaces(buffer.row(idx).render())
 }
 
-/// Whether the row has code structure (is not blank and not free-form text).
 pub fn row_has_indent(buffer: &Buffer, idx: usize) -> bool {
     structural_indent(buffer, idx).is_some()
 }
 
-/// Indent used to draw guides on a row. A blank row takes the indent of the
-/// next non-blank row, so guides stay continuous right after a block header
-/// and stop where the block ends. Blank rows at the edges have no guides.
 pub fn effective_indent(buffer: &Buffer, idx: usize) -> usize {
     if let Some(w) = structural_indent(buffer, idx) {
         return w;
@@ -74,10 +64,6 @@ pub fn effective_indent(buffer: &Buffer, idx: usize) -> usize {
         .unwrap_or(0)
 }
 
-/// Detects the indentation unit (in render columns) used by the buffer:
-/// one tab stop for tab-indented files, otherwise the most common indent
-/// step between consecutive code lines, falling back to the language's
-/// usual width when the file has no indented code yet.
 pub fn detect_unit(buffer: &Buffer, filetype: &str, tab_stop: usize) -> usize {
     let mut tab_rows = 0usize;
     let mut space_rows = 0usize;
@@ -127,13 +113,10 @@ pub fn detect_unit(buffer: &Buffer, filetype: &str, tab_stop: usize) -> usize {
     }
 }
 
-/// Whether a guide is drawn at render column `col` of a row indented by `indent`.
-/// Only complete indentation levels get a guide.
 pub fn is_guide_col(col: usize, indent: usize, unit: usize) -> bool {
     unit > 0 && col.is_multiple_of(unit) && col + unit <= indent
 }
 
-/// The guide of the block that contains the cursor, highlighted as a whole.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ActiveGuide {
     pub col: usize,
@@ -152,10 +135,6 @@ fn next_structural_indent(buffer: &Buffer, idx: usize) -> Option<usize> {
     (idx + 1..end).find_map(|i| structural_indent(buffer, i))
 }
 
-/// Finds the block the cursor is in. On a block header (a line followed by
-/// more deeply indented lines) it is the block the header opens; elsewhere it
-/// is the innermost block around the line. The block spans every consecutive
-/// row, blank rows included, that is indented past the guide.
 pub fn active_guide(buffer: &Buffer, cursor_row: usize, unit: usize) -> Option<ActiveGuide> {
     if unit == 0 || cursor_row >= buffer.num_rows() {
         return None;
