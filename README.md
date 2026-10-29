@@ -38,14 +38,6 @@ La liste complète des fonctionnalités et des raccourcis est dans l'éditeur : 
 
 Cera cible Linux (x86_64 et aarch64). Il faut un terminal compatible ANSI ; les couleurs 24 bits sont recommandées (sinon, mettez `true_color` à `false`, voir [Configuration](#configuration)). Les plugins fournis demandent `python3`.
 
-| Méthode | Pour qui | Plugins |
-|---|---|---|
-| [Nix](#avec-nix) | NixOS, ou Nix sur n'importe quelle distribution | copiés et activés au premier lancement |
-| [Paquet `.deb` ou `.rpm`](#depuis-une-release-debian-ubuntu-fedora) | Debian, Ubuntu, Fedora… | copiés et activés au premier lancement |
-| [Archive `.tar.gz`](#depuis-une-release-debian-ubuntu-fedora) | toute distribution Linux | copiés au premier lancement si le dossier `plugins` est à côté du binaire, sinon avec `plugins/install.sh` |
-| [PKGBUILD](#sur-arch-linux) | Arch Linux et dérivés | copiés et activés au premier lancement |
-| [Sources](#depuis-les-sources) | développeurs | à copier avec `plugins/install.sh` |
-
 ### Avec Nix
 
 ```
@@ -78,7 +70,7 @@ sudo apt install ./cera_0.1.0_amd64.deb         # Debian, Ubuntu (arm64 : cera_0
 sudo dnf install ./cera-0.1.0-1.x86_64.rpm      # Fedora (aarch64 : cera-0.1.0-1.aarch64.rpm)
 ```
 
-L'archive contient le binaire et les plugins, sans rien installer dans le système :
+L'archive contient le binaire et les plugins :
 
 ```
 tar -xzf cera-0.1.0-linux-x86_64.tar.gz

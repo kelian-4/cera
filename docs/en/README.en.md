@@ -21,14 +21,6 @@ The full list of features and shortcuts is in the editor: `Ctrl-D`, or `cera --h
 
 Cera targets Linux (x86_64 and aarch64). You need an ANSI-compatible terminal; 24-bit colors are recommended (otherwise set `true_color` to `false`, see [Configuration](#configuration)). The bundled plugins require `python3`.
 
-| Method | For whom | Plugins |
-|---|---|---|
-| [Nix](#with-nix) | NixOS, or Nix on any distribution | copied and enabled on first launch |
-| [`.deb` or `.rpm` package](#from-a-release-debian-ubuntu-fedora) | Debian, Ubuntu, Fedora… | copied and enabled on first launch |
-| [`.tar.gz` archive](#from-a-release-debian-ubuntu-fedora) | any Linux distribution | copied on first launch if the `plugins` folder is next to the binary, otherwise with `plugins/install.sh` |
-| [PKGBUILD](#on-arch-linux) | Arch Linux and derivatives | copied and enabled on first launch |
-| [Source](#from-source) | developers | to be copied with `plugins/install.sh` |
-
 ### With Nix
 
 ```
@@ -61,7 +53,7 @@ sudo apt install ./cera_0.1.0_amd64.deb         # Debian, Ubuntu (arm64: cera_0.
 sudo dnf install ./cera-0.1.0-1.x86_64.rpm      # Fedora (aarch64: cera-0.1.0-1.aarch64.rpm)
 ```
 
-The archive contains the binary and the plugins, and installs nothing system-wide:
+The archive contains the binary and the plugins:
 
 ```
 tar -xzf cera-0.1.0-linux-x86_64.tar.gz
